@@ -17,6 +17,8 @@ import {
   Mail,
   CalendarDays,
   Info,
+  Heart,
+  UserPlus,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -95,6 +97,18 @@ const studentNavItems = [
     titleEn: 'Deadlines',
     icon: CalendarDays,
     url: '/deadlines',
+  },
+  {
+    titleAr: 'مطابقة الأقران',
+    titleEn: 'Peer Matching',
+    icon: UserPlus,
+    url: '/peer-matching',
+  },
+  {
+    titleAr: 'فحص الصحة',
+    titleEn: 'Wellness',
+    icon: Heart,
+    url: '/wellness',
   },
   {
     titleAr: 'الرسائل',

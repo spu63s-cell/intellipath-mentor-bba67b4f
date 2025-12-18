@@ -28,6 +28,8 @@ import Messages from '@/pages/Messages';
 import Deadlines from '@/pages/Deadlines';
 import About from '@/pages/About';
 import NotFound from '@/pages/NotFound';
+import PeerMatching from '@/pages/PeerMatching';
+import WellnessCheck from '@/pages/WellnessCheck';
 
 const queryClient = new QueryClient();
 
@@ -67,7 +69,8 @@ function AppContent() {
       <Route path="/advisor-dashboard" element={<ProtectedRoute allowedRoles={['advisor', 'admin']}><AdvisorDashboard /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><Admin /></ProtectedRoute>} />
       <Route path="/about" element={<ProtectedRoute><About /></ProtectedRoute>} />
-      <Route path="*" element={<NotFound />} />
+      <Route path="/peer-matching" element={<ProtectedRoute><PeerMatching /></ProtectedRoute>} />
+      <Route path="/wellness" element={<ProtectedRoute><WellnessCheck /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
