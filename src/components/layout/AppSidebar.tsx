@@ -14,6 +14,8 @@ import {
   Calculator,
   Sparkles,
   AlertTriangle,
+  Mail,
+  CalendarDays,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -86,6 +88,18 @@ const studentNavItems = [
     titleEn: 'Talent Ledger',
     icon: Sparkles,
     url: '/talent-ledger',
+  },
+  {
+    titleAr: 'المواعيد النهائية',
+    titleEn: 'Deadlines',
+    icon: CalendarDays,
+    url: '/deadlines',
+  },
+  {
+    titleAr: 'الرسائل',
+    titleEn: 'Messages',
+    icon: Mail,
+    url: '/messages',
   },
 ];
 

@@ -14,11 +14,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useToast } from '@/hooks/use-toast';
 import { useAdvisorStats } from '@/hooks/useAdvisorStats';
+import { exportAdvisorStatsToExcel, exportStudentListToExcel } from '@/utils/excelExport';
 import { 
   AlertTriangle, TrendingDown, TrendingUp, Users, Search, Filter,
   Bell, Mail, MessageSquare, Eye, ChevronDown, ChevronUp,
   GraduationCap, BookOpen, Clock, Target, CheckCircle2, XCircle,
-  BarChart3, PieChart, Activity, Send, UserCheck, AlertCircle, Award
+  BarChart3, PieChart, Activity, Send, UserCheck, AlertCircle, Award, Download
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPie, Pie, Cell, AreaChart, Area } from 'recharts';
 
@@ -304,12 +305,30 @@ export default function AdvisorDashboard() {
             </h1>
             <p className="text-muted-foreground">{texts.subtitle}</p>
           </div>
-          {selectedStudents.length > 0 && (
-            <Button onClick={() => setShowNotificationDialog(true)} className="gap-2">
-              <Bell className="h-4 w-4" />
-              {texts.sendNotification} ({selectedStudents.length})
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={() => {
+                if (stats) {
+                  exportAdvisorStatsToExcel(stats, language);
+                  toast({
+                    title: isRTL ? 'تم التصدير' : 'Exported',
+                    description: isRTL ? 'تم تصدير الإحصائيات بنجاح' : 'Statistics exported successfully'
+                  });
+                }
+              }}
+            >
+              <Download className="h-4 w-4" />
+              {isRTL ? 'تصدير Excel' : 'Export Excel'}
             </Button>
-          )}
+            {selectedStudents.length > 0 && (
+              <Button onClick={() => setShowNotificationDialog(true)} className="gap-2">
+                <Bell className="h-4 w-4" />
+                {texts.sendNotification} ({selectedStudents.length})
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stats Cards */}
