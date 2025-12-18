@@ -12,6 +12,7 @@ import {
   Users,
   Lightbulb,
   Calculator,
+  Sparkles,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -78,6 +79,12 @@ const studentNavItems = [
     titleEn: 'Simulator',
     icon: Calculator,
     url: '/simulator',
+  },
+  {
+    titleAr: 'سجل المواهب',
+    titleEn: 'Talent Ledger',
+    icon: Sparkles,
+    url: '/talent-ledger',
   },
 ];
 
