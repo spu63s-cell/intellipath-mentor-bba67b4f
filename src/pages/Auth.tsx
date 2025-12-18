@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, GraduationCap, Loader2, Building2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, GraduationCap, Loader2, Building2, Sparkles } from 'lucide-react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { Moon, Sun, Languages } from 'lucide-react';
+import { ParticlesBackground, FloatingOrbs, GridPattern } from '@/components/ui/particles-background';
 
 const departments = [
   { value: 'هندسة المعلوماتية', labelAr: 'هندسة المعلوماتية', labelEn: 'Information Engineering' },
@@ -170,28 +171,36 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen w-full overflow-hidden gradient-hero">
+    <div className="min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Animated Background */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 h-80 w-80 rounded-full bg-secondary/20 blur-3xl" />
-        <div className="absolute top-1/2 -left-20 h-60 w-60 rounded-full bg-primary/10 blur-3xl" />
-        <div className="absolute bottom-20 right-1/4 h-40 w-40 rounded-full bg-secondary/10 blur-2xl" />
-      </div>
+      <FloatingOrbs />
+      <ParticlesBackground particleCount={60} />
+      <GridPattern />
 
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between p-4 md:p-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-secondary text-secondary-foreground shadow-lg">
-            <GraduationCap className="h-6 w-6" />
+        <motion.div 
+          className="flex items-center gap-3"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-500/25">
+            <GraduationCap className="h-7 w-7" />
           </div>
-          <span className="text-xl font-bold text-primary-foreground">IntelliPath</span>
-        </div>
-        <div className="flex items-center gap-2">
+          <span className="text-2xl font-bold text-white">IntelliPath</span>
+        </motion.div>
+        <motion.div 
+          className="flex items-center gap-2"
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.5 }}
+        >
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleLanguage}
-            className="text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            className="text-white/70 hover:bg-white/10 hover:text-white"
           >
             <Languages className="h-5 w-5" />
           </Button>
@@ -199,285 +208,316 @@ export default function Auth() {
             variant="ghost"
             size="icon"
             onClick={toggleTheme}
-            className="text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+            className="text-white/70 hover:bg-white/10 hover:text-white"
           >
             {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </Button>
-        </div>
+        </motion.div>
       </header>
 
       {/* Main Content */}
       <div className="relative z-10 flex min-h-[calc(100vh-80px)] items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
+          initial={{ opacity: 0, y: 30, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
           className="w-full max-w-md"
         >
-          {/* Card */}
-          <div className="rounded-2xl bg-card/95 p-8 shadow-2xl backdrop-blur-xl">
-            {/* Title */}
-            <div className="mb-8 text-center">
-              <h1 className="mb-2 text-2xl font-bold text-foreground">
-                {isLogin
-                  ? t('تسجيل الدخول', 'Sign In')
-                  : t('إنشاء حساب جديد', 'Create Account')}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {isLogin
-                  ? t('أدخل بياناتك للوصول إلى حسابك', 'Enter your credentials to access your account')
-                  : t('أنشئ حسابك للبدء في رحلتك الأكاديمية', 'Create your account to start your academic journey')}
+          {/* Card with glassmorphism */}
+          <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
+            {/* Gradient border effect */}
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-teal-500/20 via-transparent to-cyan-500/20 pointer-events-none" />
+            
+            {/* Animated glow */}
+            <motion.div
+              className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-teal-500/30 blur-3xl"
+              animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+              transition={{ duration: 4, repeat: Infinity }}
+            />
+            
+            <div className="relative z-10">
+              {/* Title */}
+              <div className="mb-8 text-center">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
+                  className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/30"
+                >
+                  <Sparkles className="h-8 w-8 text-white" />
+                </motion.div>
+                <h1 className="mb-2 text-2xl font-bold text-white">
+                  {isLogin
+                    ? t('تسجيل الدخول', 'Sign In')
+                    : t('إنشاء حساب جديد', 'Create Account')}
+                </h1>
+                <p className="text-sm text-white/60">
+                  {isLogin
+                    ? t('أدخل بياناتك للوصول إلى حسابك', 'Enter your credentials to access your account')
+                    : t('أنشئ حسابك للبدء في رحلتك الأكاديمية', 'Create your account to start your academic journey')}
+                </p>
+              </div>
+
+              {/* Toggle */}
+              <div className="mb-6 flex rounded-xl bg-white/5 p-1 border border-white/10">
+                <button
+                  onClick={() => setIsLogin(true)}
+                  className={`relative flex-1 rounded-lg py-2.5 text-sm font-medium transition-all ${
+                    isLogin
+                      ? 'text-white'
+                      : 'text-white/50 hover:text-white/70'
+                  }`}
+                >
+                  {isLogin && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500"
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10">{t('تسجيل الدخول', 'Login')}</span>
+                </button>
+                <button
+                  onClick={() => setIsLogin(false)}
+                  className={`relative flex-1 rounded-lg py-2.5 text-sm font-medium transition-all ${
+                    !isLogin
+                      ? 'text-white'
+                      : 'text-white/50 hover:text-white/70'
+                  }`}
+                >
+                  {!isLogin && (
+                    <motion.div
+                      layoutId="activeTab"
+                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500"
+                      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative z-10">{t('حساب جديد', 'Register')}</span>
+                </button>
+              </div>
+
+              {/* Forms */}
+              <AnimatePresence mode="wait">
+                {isLogin ? (
+                  <motion.form
+                    key="login"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleLogin}
+                    className="space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-white/80">{t('البريد الإلكتروني', 'Email')}</Label>
+                      <div className="relative group">
+                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder={t('أدخل بريدك الإلكتروني', 'Enter your email')}
+                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          value={loginForm.email}
+                          onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                        />
+                      </div>
+                      {errors.email && (
+                        <p className="text-xs text-red-400">{errors.email}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="password" className="text-white/80">{t('كلمة المرور', 'Password')}</Label>
+                      <div className="relative group">
+                        <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder={t('أدخل كلمة المرور', 'Enter your password')}
+                          className="pl-10 pr-10 rtl:pl-10 rtl:pr-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          value={loginForm.password}
+                          onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 rtl:left-auto rtl:right-3"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                      {errors.password && (
+                        <p className="text-xs text-red-400">{errors.password}</p>
+                      )}
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-medium shadow-lg shadow-teal-500/25 transition-all hover:shadow-teal-500/40"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="ml-2 h-4 w-4 animate-spin rtl:ml-0 rtl:mr-2" />
+                          {t('جاري التحميل...', 'Loading...')}
+                        </>
+                      ) : (
+                        t('تسجيل الدخول', 'Sign In')
+                      )}
+                    </Button>
+                  </motion.form>
+                ) : (
+                  <motion.form
+                    key="register"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={handleRegister}
+                    className="space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor="fullName" className="text-white/80">{t('الاسم الكامل', 'Full Name')}</Label>
+                      <div className="relative group">
+                        <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Input
+                          id="fullName"
+                          placeholder={t('أدخل اسمك الكامل', 'Enter your full name')}
+                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          value={registerForm.fullName}
+                          onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
+                        />
+                      </div>
+                      {errors.fullName && (
+                        <p className="text-xs text-red-400">{errors.fullName}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="regEmail" className="text-white/80">{t('البريد الإلكتروني', 'Email')}</Label>
+                      <div className="relative group">
+                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Input
+                          id="regEmail"
+                          type="email"
+                          placeholder={t('أدخل بريدك الإلكتروني', 'Enter your email')}
+                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          value={registerForm.email}
+                          onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
+                        />
+                      </div>
+                      {errors.email && (
+                        <p className="text-xs text-red-400">{errors.email}</p>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="studentId" className="text-white/80">{t('الرقم الجامعي', 'Student ID')}</Label>
+                        <div className="relative group">
+                          <GraduationCap className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                          <Input
+                            id="studentId"
+                            placeholder={t('الرقم', 'ID')}
+                            className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                            value={registerForm.studentId}
+                            onChange={(e) => setRegisterForm({ ...registerForm, studentId: e.target.value })}
+                          />
+                        </div>
+                        {errors.studentId && (
+                          <p className="text-xs text-red-400">{errors.studentId}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="department" className="text-white/80">{t('القسم', 'Department')}</Label>
+                        <Select
+                          value={registerForm.department}
+                          onValueChange={(value) => setRegisterForm({ ...registerForm, department: value })}
+                        >
+                          <SelectTrigger className="w-full bg-white/5 border-white/10 text-white focus:border-teal-500/50 focus:ring-teal-500/20">
+                            <Building2 className="h-4 w-4 text-white/40 me-2" />
+                            <SelectValue placeholder={t('اختر', 'Select')} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-white/10">
+                            {departments.map((dept) => (
+                              <SelectItem key={dept.value} value={dept.value} className="text-white hover:bg-white/10">
+                                {language === 'ar' ? dept.labelAr : dept.labelEn}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {errors.department && (
+                          <p className="text-xs text-red-400">{errors.department}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="regPassword" className="text-white/80">{t('كلمة المرور', 'Password')}</Label>
+                        <div className="relative group">
+                          <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                          <Input
+                            id="regPassword"
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="••••••"
+                            className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                            value={registerForm.password}
+                            onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                          />
+                        </div>
+                        {errors.password && (
+                          <p className="text-xs text-red-400">{errors.password}</p>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword" className="text-white/80">{t('تأكيد', 'Confirm')}</Label>
+                        <div className="relative group">
+                          <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                          <Input
+                            id="confirmPassword"
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="••••••"
+                            className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                            value={registerForm.confirmPassword}
+                            onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                          />
+                        </div>
+                        {errors.confirmPassword && (
+                          <p className="text-xs text-red-400">{errors.confirmPassword}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-medium shadow-lg shadow-teal-500/25 transition-all hover:shadow-teal-500/40"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="ml-2 h-4 w-4 animate-spin rtl:ml-0 rtl:mr-2" />
+                          {t('جاري التحميل...', 'Loading...')}
+                        </>
+                      ) : (
+                        t('إنشاء الحساب', 'Create Account')
+                      )}
+                    </Button>
+                  </motion.form>
+                )}
+              </AnimatePresence>
+
+              {/* Footer */}
+              <p className="mt-6 text-center text-xs text-white/40">
+                {t(
+                  'بتسجيلك أنت توافق على شروط الاستخدام وسياسة الخصوصية',
+                  'By signing up, you agree to our Terms and Privacy Policy'
+                )}
               </p>
             </div>
-
-            {/* Toggle */}
-            <div className="mb-6 flex rounded-lg bg-muted p-1">
-              <button
-                onClick={() => setIsLogin(true)}
-                className={`flex-1 rounded-md py-2 text-sm font-medium transition-all ${
-                  isLogin
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {t('تسجيل الدخول', 'Login')}
-              </button>
-              <button
-                onClick={() => setIsLogin(false)}
-                className={`flex-1 rounded-md py-2 text-sm font-medium transition-all ${
-                  !isLogin
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {t('حساب جديد', 'Register')}
-              </button>
-            </div>
-
-            {/* Forms */}
-            <AnimatePresence mode="wait">
-              {isLogin ? (
-                <motion.form
-                  key="login"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3 }}
-                  onSubmit={handleLogin}
-                  className="space-y-4"
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor="email">{t('البريد الإلكتروني', 'Email')}</Label>
-                    <div className="relative">
-                      <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
-                      <Input
-                        id="email"
-                        type="email"
-                        placeholder={t('أدخل بريدك الإلكتروني', 'Enter your email')}
-                        className="pr-10 rtl:pl-10 rtl:pr-3"
-                        value={loginForm.email}
-                        onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                      />
-                    </div>
-                    {errors.email && (
-                      <p className="text-xs text-destructive">{errors.email}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="password">{t('كلمة المرور', 'Password')}</Label>
-                    <div className="relative">
-                      <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
-                      <Input
-                        id="password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder={t('أدخل كلمة المرور', 'Enter your password')}
-                        className="pl-10 pr-10 rtl:pl-10 rtl:pr-10"
-                        value={loginForm.password}
-                        onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rtl:left-auto rtl:right-3"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    {errors.password && (
-                      <p className="text-xs text-destructive">{errors.password}</p>
-                    )}
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-primary hover:bg-primary/90"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="ml-2 h-4 w-4 animate-spin rtl:ml-0 rtl:mr-2" />
-                        {t('جاري التحميل...', 'Loading...')}
-                      </>
-                    ) : (
-                      t('تسجيل الدخول', 'Sign In')
-                    )}
-                  </Button>
-                </motion.form>
-              ) : (
-                <motion.form
-                  key="register"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  onSubmit={handleRegister}
-                  className="space-y-4"
-                >
-                  <div className="space-y-2">
-                    <Label htmlFor="fullName">{t('الاسم الكامل', 'Full Name')}</Label>
-                    <div className="relative">
-                      <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
-                      <Input
-                        id="fullName"
-                        placeholder={t('أدخل اسمك الكامل', 'Enter your full name')}
-                        className="pr-10 rtl:pl-10 rtl:pr-3"
-                        value={registerForm.fullName}
-                        onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
-                      />
-                    </div>
-                    {errors.fullName && (
-                      <p className="text-xs text-destructive">{errors.fullName}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="regEmail">{t('البريد الإلكتروني', 'Email')}</Label>
-                    <div className="relative">
-                      <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
-                      <Input
-                        id="regEmail"
-                        type="email"
-                        placeholder={t('أدخل بريدك الإلكتروني', 'Enter your email')}
-                        className="pr-10 rtl:pl-10 rtl:pr-3"
-                        value={registerForm.email}
-                        onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
-                      />
-                    </div>
-                    {errors.email && (
-                      <p className="text-xs text-destructive">{errors.email}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="studentId">{t('الرقم الجامعي', 'Student ID')}</Label>
-                    <div className="relative">
-                      <GraduationCap className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
-                      <Input
-                        id="studentId"
-                        placeholder={t('أدخل رقمك الجامعي', 'Enter your student ID')}
-                        className="pr-10 rtl:pl-10 rtl:pr-3"
-                        value={registerForm.studentId}
-                        onChange={(e) => setRegisterForm({ ...registerForm, studentId: e.target.value })}
-                      />
-                    </div>
-                    {errors.studentId && (
-                      <p className="text-xs text-destructive">{errors.studentId}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="department">{t('القسم', 'Department')}</Label>
-                    <Select
-                      value={registerForm.department}
-                      onValueChange={(value) => setRegisterForm({ ...registerForm, department: value })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <Building2 className="h-4 w-4 text-muted-foreground me-2" />
-                        <SelectValue placeholder={t('اختر القسم', 'Select Department')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {departments.map((dept) => (
-                          <SelectItem key={dept.value} value={dept.value}>
-                            {language === 'ar' ? dept.labelAr : dept.labelEn}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.department && (
-                      <p className="text-xs text-destructive">{errors.department}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="regPassword">{t('كلمة المرور', 'Password')}</Label>
-                    <div className="relative">
-                      <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
-                      <Input
-                        id="regPassword"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder={t('أدخل كلمة المرور', 'Enter your password')}
-                        className="pl-10 pr-10"
-                        value={registerForm.password}
-                        onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rtl:left-auto rtl:right-3"
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    {errors.password && (
-                      <p className="text-xs text-destructive">{errors.password}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">{t('تأكيد كلمة المرور', 'Confirm Password')}</Label>
-                    <div className="relative">
-                      <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
-                      <Input
-                        id="confirmPassword"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder={t('أعد إدخال كلمة المرور', 'Confirm your password')}
-                        className="pr-10 rtl:pl-10 rtl:pr-3"
-                        value={registerForm.confirmPassword}
-                        onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                      />
-                    </div>
-                    {errors.confirmPassword && (
-                      <p className="text-xs text-destructive">{errors.confirmPassword}</p>
-                    )}
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full bg-primary hover:bg-primary/90"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="ml-2 h-4 w-4 animate-spin rtl:ml-0 rtl:mr-2" />
-                        {t('جاري التحميل...', 'Loading...')}
-                      </>
-                    ) : (
-                      t('إنشاء الحساب', 'Create Account')
-                    )}
-                  </Button>
-                </motion.form>
-              )}
-            </AnimatePresence>
           </div>
-
-          {/* Footer */}
-          <p className="mt-6 text-center text-sm text-primary-foreground/60">
-            {t(
-              'الجامعة السورية الخاصة - كلية الهندسة',
-              'Syrian Private University - Faculty of Engineering'
-            )}
-          </p>
         </motion.div>
       </div>
     </div>
