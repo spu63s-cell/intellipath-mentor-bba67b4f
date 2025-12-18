@@ -12,6 +12,8 @@ import { useLanguageStore } from '@/stores/languageStore';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
 import Chat from '@/pages/Chat';
+import KnowledgeGraph from '@/pages/KnowledgeGraph';
+import Achievements from '@/pages/Achievements';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -38,8 +40,8 @@ function AppContent() {
       />
       {/* Chat with AI Advisor */}
       <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
-      <Route path="/knowledge-graph" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/achievements" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/knowledge-graph" element={<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>} />
+      <Route path="/achievements" element={<ProtectedRoute><Achievements /></ProtectedRoute>} />
       <Route path="/courses" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/career" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
