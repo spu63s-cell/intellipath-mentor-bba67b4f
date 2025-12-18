@@ -21,6 +21,7 @@ import Career from '@/pages/Career';
 import LearningStyle from '@/pages/LearningStyle';
 import DecisionSimulator from '@/pages/DecisionSimulator';
 import TalentLedger from '@/pages/TalentLedger';
+import AdvisorDashboard from '@/pages/AdvisorDashboard';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ function AppContent() {
       <Route path="/learning-style" element={<ProtectedRoute><LearningStyle /></ProtectedRoute>} />
       <Route path="/simulator" element={<ProtectedRoute><DecisionSimulator /></ProtectedRoute>} />
       <Route path="/talent-ledger" element={<ProtectedRoute><TalentLedger /></ProtectedRoute>} />
+      <Route path="/advisor-dashboard" element={<ProtectedRoute><AdvisorDashboard /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

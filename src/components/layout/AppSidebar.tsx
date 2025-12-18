@@ -13,6 +13,7 @@ import {
   Lightbulb,
   Calculator,
   Sparkles,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -90,16 +91,10 @@ const studentNavItems = [
 
 const advisorNavItems = [
   {
-    titleAr: 'لوحة المراقبة',
-    titleEn: 'Monitor Dashboard',
-    icon: Shield,
-    url: '/advisor/dashboard',
-  },
-  {
-    titleAr: 'الطلاب',
-    titleEn: 'Students',
-    icon: Users,
-    url: '/advisor/students',
+    titleAr: 'الإنذار المبكر',
+    titleEn: 'Early Warning',
+    icon: AlertTriangle,
+    url: '/advisor-dashboard',
   },
 ];
 
