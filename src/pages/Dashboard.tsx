@@ -21,6 +21,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useStudentDashboard } from '@/hooks/useStudentDashboard';
+import { ExportReportButton } from '@/components/dashboard/ExportReportButton';
+import { useAuthStore } from '@/stores/authStore';
 
 // Mock data for demonstration when no real data exists
 const mockDeadlines = [
@@ -32,6 +34,7 @@ const mockDeadlines = [
 export default function Dashboard() {
   const navigate = useNavigate();
   const { t, language } = useLanguageStore();
+  const { user } = useAuthStore();
   const { student, profile, enrollments, achievements, isLoading, nextLevelXp, xpProgress } = useStudentDashboard();
 
   // Default values
@@ -87,7 +90,25 @@ export default function Dashboard() {
                   </p>
                 </div>
                 
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap items-center gap-4">
+                  <ExportReportButton
+                    student={{
+                      name: displayData.name,
+                      studentId: student?.student_id || '',
+                      department: displayData.department,
+                      yearLevel: displayData.year,
+                      gpa: displayData.gpa,
+                      totalCredits: displayData.totalCredits,
+                      email: user?.email || '',
+                    }}
+                    courses={enrollments.map(e => ({
+                      name: e.course?.name || '',
+                      code: e.course?.code || '',
+                      credits: e.course?.credits || 3,
+                      grade: e.letter_grade || undefined,
+                      semester: e.semester,
+                    }))}
+                  />
                   <div className="rounded-xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
                     <p className="text-xs text-primary-foreground/70">{t('المعدل التراكمي', 'GPA')}</p>
                     <p className="text-2xl font-bold">{displayData.gpa.toFixed(2)}</p>

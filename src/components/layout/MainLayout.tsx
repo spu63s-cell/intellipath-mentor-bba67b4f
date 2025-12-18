@@ -2,6 +2,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { Navbar } from './Navbar';
 import { MobileNavigation } from './MobileNavigation';
+import { PushNotificationPrompt } from '@/components/notifications/PushNotificationPrompt';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -20,6 +21,7 @@ export function MainLayout({ children }: MainLayoutProps) {
           <MobileNavigation />
         </div>
       </div>
+      <PushNotificationPrompt />
     </SidebarProvider>
   );
 }
