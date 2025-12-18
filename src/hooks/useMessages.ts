@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
+import { usePushNotifications } from './usePushNotifications';
+import { useLanguageStore } from '@/stores/languageStore';
 
 interface Message {
   id: string;
@@ -29,6 +31,8 @@ interface SendMessageData {
 
 export const useMessages = () => {
   const { user } = useAuthStore();
+  const { language } = useLanguageStore();
+  const { notifyImportant, isEnabled } = usePushNotifications();
   const queryClient = useQueryClient();
 
   // Fetch all messages (sent and received)
@@ -67,6 +71,56 @@ export const useMessages = () => {
     },
     enabled: !!user?.id,
   });
+
+  // Realtime subscription for new messages
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('messages-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `receiver_id=eq.${user.id}`
+        },
+        async (payload) => {
+          console.log('New message received:', payload);
+          
+          // Invalidate queries to refresh data
+          queryClient.invalidateQueries({ queryKey: ['messages'] });
+          
+          // Send push notification for new message
+          if (isEnabled && payload.new) {
+            const newMessage = payload.new as any;
+            
+            // Get sender name
+            const { data: senderProfile } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('user_id', newMessage.sender_id)
+              .single();
+            
+            const senderName = senderProfile?.full_name || 'Unknown';
+            const isAr = language === 'ar';
+            
+            notifyImportant(
+              `📨 رسالة جديدة من ${senderName}`,
+              `📨 New message from ${senderName}`,
+              newMessage.subject || (isAr ? 'رسالة جديدة' : 'New message'),
+              newMessage.subject || 'New message'
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient, isEnabled, language, notifyImportant]);
 
   // Send a new message
   const sendMessage = useMutation({
