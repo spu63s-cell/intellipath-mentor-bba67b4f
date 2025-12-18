@@ -10,44 +10,19 @@ import {
   Flame,
   Star,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Award,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useStudentDashboard } from '@/hooks/useStudentDashboard';
 
-// Mock data for demonstration
-const mockStudent = {
-  name: 'أحمد محمد',
-  nameEn: 'Ahmed Mohammed',
-  studentId: '2021001234',
-  department: 'هندسة المعلوماتية',
-  departmentEn: 'Information Engineering',
-  year: 3,
-  gpa: 3.45,
-  totalCredits: 87,
-  xp: 2450,
-  level: 12,
-  nextLevelXp: 3000,
-  streak: 7,
-};
-
-const mockCourses = [
-  { name: 'هياكل البيانات', nameEn: 'Data Structures', grade: 'A', credits: 3 },
-  { name: 'قواعد البيانات', nameEn: 'Databases', grade: 'B+', credits: 3 },
-  { name: 'الشبكات الحاسوبية', nameEn: 'Computer Networks', grade: 'A-', credits: 3 },
-  { name: 'هندسة البرمجيات', nameEn: 'Software Engineering', grade: 'B', credits: 3 },
-];
-
-const mockAchievements = [
-  { icon: Star, name: 'طالب متميز', nameEn: 'Distinguished Student', color: 'text-yellow-500' },
-  { icon: Flame, name: 'سلسلة 7 أيام', nameEn: '7 Day Streak', color: 'text-orange-500' },
-  { icon: BookOpen, name: 'قارئ نهم', nameEn: 'Avid Reader', color: 'text-blue-500' },
-];
-
+// Mock data for demonstration when no real data exists
 const mockDeadlines = [
   { title: 'تسليم مشروع البرمجيات', titleEn: 'Software Project Submission', date: '2024-01-20', daysLeft: 3 },
   { title: 'امتحان الشبكات', titleEn: 'Networks Exam', date: '2024-01-25', daysLeft: 8 },
@@ -57,9 +32,36 @@ const mockDeadlines = [
 export default function Dashboard() {
   const navigate = useNavigate();
   const { t, language } = useLanguageStore();
-  const { user } = useAuthStore();
+  const { student, profile, enrollments, achievements, isLoading, nextLevelXp, xpProgress } = useStudentDashboard();
 
-  const xpProgress = (mockStudent.xp / mockStudent.nextLevelXp) * 100;
+  // Default values
+  const displayData = {
+    name: profile?.full_name || 'طالب جديد',
+    nameEn: profile?.full_name || 'New Student',
+    department: student?.department || 'هندسة المعلوماتية',
+    year: student?.year_level || 1,
+    gpa: student?.gpa || 0,
+    totalCredits: student?.total_credits || 0,
+    xp: student?.xp_points || 0,
+    level: student?.level || 1,
+    streak: student?.streak_days || 0,
+  };
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="container mx-auto space-y-6 p-4 md:p-6">
+          <Skeleton className="h-40 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            {[1, 2, 3, 4].map(i => (
+              <Skeleton key={i} className="h-24 w-full rounded-xl" />
+            ))}
+          </div>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -78,21 +80,21 @@ export default function Dashboard() {
                     {t('مرحباً بك', 'Welcome back')},
                   </p>
                   <h1 className="text-2xl font-bold md:text-3xl">
-                    {language === 'ar' ? mockStudent.name : mockStudent.nameEn}
+                    {language === 'ar' ? displayData.name : displayData.nameEn}
                   </h1>
                   <p className="text-sm text-primary-foreground/70">
-                    {t(mockStudent.department, mockStudent.departmentEn)} • {t('السنة', 'Year')} {mockStudent.year}
+                    {displayData.department} • {t('السنة', 'Year')} {displayData.year}
                   </p>
                 </div>
                 
                 <div className="flex flex-wrap gap-4">
                   <div className="rounded-xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
                     <p className="text-xs text-primary-foreground/70">{t('المعدل التراكمي', 'GPA')}</p>
-                    <p className="text-2xl font-bold">{mockStudent.gpa}</p>
+                    <p className="text-2xl font-bold">{displayData.gpa.toFixed(2)}</p>
                   </div>
                   <div className="rounded-xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
                     <p className="text-xs text-primary-foreground/70">{t('الساعات المكتسبة', 'Credits')}</p>
-                    <p className="text-2xl font-bold">{mockStudent.totalCredits}</p>
+                    <p className="text-2xl font-bold">{displayData.totalCredits}</p>
                   </div>
                 </div>
               </div>
@@ -115,16 +117,16 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <p className="font-semibold">
-                      {t('المستوى', 'Level')} {mockStudent.level}
+                      {t('المستوى', 'Level')} {displayData.level}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {mockStudent.xp} / {mockStudent.nextLevelXp} XP
+                      {displayData.xp} / {nextLevelXp} XP
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 rounded-full bg-orange-100 px-3 py-1.5 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400">
                   <Flame className="h-4 w-4" />
-                  <span className="text-sm font-medium">{mockStudent.streak} {t('يوم', 'days')}</span>
+                  <span className="text-sm font-medium">{displayData.streak} {t('يوم', 'days')}</span>
                 </div>
               </div>
               <Progress value={xpProgress} className="mt-4 h-2" />
@@ -180,31 +182,49 @@ export default function Dashboard() {
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {mockCourses.map((course, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between rounded-lg bg-muted/50 p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                          <BookOpen className="h-5 w-5" />
+                {enrollments.length > 0 ? (
+                  <div className="space-y-3">
+                    {enrollments.slice(0, 4).map((enrollment) => (
+                      <div
+                        key={enrollment.id}
+                        className="flex items-center justify-between rounded-lg bg-muted/50 p-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <BookOpen className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="font-medium">
+                              {language === 'ar' && enrollment.course?.name_ar 
+                                ? enrollment.course.name_ar 
+                                : enrollment.course?.name || 'مقرر'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {enrollment.course?.credits || 3} {t('ساعات', 'credits')}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{language === 'ar' ? course.name : course.nameEn}</p>
-                          <p className="text-xs text-muted-foreground">{course.credits} {t('ساعات', 'credits')}</p>
-                        </div>
+                        {enrollment.letter_grade && (
+                          <span className={`rounded-full px-3 py-1 text-sm font-semibold ${
+                            enrollment.letter_grade.startsWith('A') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                            enrollment.letter_grade.startsWith('B') ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                            'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          }`}>
+                            {enrollment.letter_grade}
+                          </span>
+                        )}
                       </div>
-                      <span className={`rounded-full px-3 py-1 text-sm font-semibold ${
-                        course.grade.startsWith('A') ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                        course.grade.startsWith('B') ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
-                        'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-                      }`}>
-                        {course.grade}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center">
+                    <BookOpen className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                    <p className="text-muted-foreground">{t('لا توجد مقررات مسجلة', 'No enrolled courses')}</p>
+                    <Button variant="link" onClick={() => navigate('/courses')}>
+                      {t('تصفح المقررات', 'Browse Courses')}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>
@@ -217,26 +237,36 @@ export default function Dashboard() {
           >
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-semibold">
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-yellow-500" />
                   {t('آخر الإنجازات', 'Recent Achievements')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {mockAchievements.map((achievement, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center gap-3 rounded-lg bg-muted/50 p-3"
-                    >
-                      <div className={`${achievement.color}`}>
-                        <achievement.icon className="h-6 w-6" />
+                {achievements.length > 0 ? (
+                  <div className="space-y-3">
+                    {achievements.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 rounded-lg bg-muted/50 p-3"
+                      >
+                        <div className="text-yellow-500">
+                          <Award className="h-6 w-6" />
+                        </div>
+                        <span className="font-medium">
+                          {language === 'ar' && item.achievement?.name_ar 
+                            ? item.achievement.name_ar 
+                            : item.achievement?.name || 'إنجاز'}
+                        </span>
                       </div>
-                      <span className="font-medium">
-                        {language === 'ar' ? achievement.name : achievement.nameEn}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <Trophy className="h-10 w-10 text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">{t('لا توجد إنجازات بعد', 'No achievements yet')}</p>
+                  </div>
+                )}
                 <Button
                   variant="outline"
                   className="mt-4 w-full"
@@ -305,20 +335,20 @@ export default function Dashboard() {
               <CardContent>
                 <div className="space-y-4">
                   <div className="text-center">
-                    <p className="text-4xl font-bold text-secondary">{mockStudent.gpa}</p>
+                    <p className="text-4xl font-bold text-secondary">{displayData.gpa.toFixed(2)}</p>
                     <p className="text-sm text-muted-foreground">{t('المعدل التراكمي الحالي', 'Current GPA')}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3 text-center">
                     <div className="rounded-lg bg-background/80 p-2">
-                      <p className="text-lg font-semibold">{mockStudent.totalCredits}</p>
+                      <p className="text-lg font-semibold">{displayData.totalCredits}</p>
                       <p className="text-xs text-muted-foreground">{t('ساعة مكتسبة', 'Credits Earned')}</p>
                     </div>
                     <div className="rounded-lg bg-background/80 p-2">
-                      <p className="text-lg font-semibold">45</p>
+                      <p className="text-lg font-semibold">{Math.max(0, 132 - displayData.totalCredits)}</p>
                       <p className="text-xs text-muted-foreground">{t('ساعة متبقية', 'Credits Left')}</p>
                     </div>
                   </div>
-                  <Button variant="secondary" className="w-full">
+                  <Button variant="secondary" className="w-full" onClick={() => navigate('/simulator')}>
                     {t('حساب المعدل المتوقع', 'Calculate Expected GPA')}
                   </Button>
                 </div>
