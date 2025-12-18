@@ -14,6 +14,9 @@ import Dashboard from '@/pages/Dashboard';
 import Chat from '@/pages/Chat';
 import KnowledgeGraph from '@/pages/KnowledgeGraph';
 import Achievements from '@/pages/Achievements';
+import Courses from '@/pages/Courses';
+import Profile from '@/pages/Profile';
+import Career from '@/pages/Career';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -42,10 +45,10 @@ function AppContent() {
       <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
       <Route path="/knowledge-graph" element={<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>} />
       <Route path="/achievements" element={<ProtectedRoute><Achievements /></ProtectedRoute>} />
-      <Route path="/courses" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/career" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/settings" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/courses" element={<ProtectedRoute><Courses /></ProtectedRoute>} />
+      <Route path="/career" element={<ProtectedRoute><Career /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
