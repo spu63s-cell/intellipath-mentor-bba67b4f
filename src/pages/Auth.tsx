@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Eye, EyeOff, Mail, Lock, User, GraduationCap, Loader2, Building2, Sparkles } from 'lucide-react';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,8 +45,10 @@ const registerSchema = z.object({
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { t, toggleLanguage, language } = useLanguageStore();
+  const { t: translate } = useTranslation();
+  const { toggleLanguage, language } = useLanguageStore();
   const { theme, toggleTheme } = useThemeStore();
+  const t = (ar: string, en: string) => language === 'ar' ? ar : en;
   
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
@@ -93,7 +96,7 @@ export default function Auth() {
     if (error) {
       toast({
         variant: 'destructive',
-        title: t('خطأ في تسجيل الدخول', 'Login Error'),
+        title: translate('auth.errors.unauthorized'),
         description: error.message === 'Invalid login credentials' 
           ? t('بيانات الدخول غير صحيحة', 'Invalid login credentials')
           : error.message,
@@ -171,7 +174,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="min-h-screen w-full overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-purple-950">
       {/* Animated Background */}
       <FloatingOrbs />
       <ParticlesBackground particleCount={60} />
@@ -185,7 +188,7 @@ export default function Auth() {
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-500/25">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25">
             <GraduationCap className="h-7 w-7" />
           </div>
           <span className="text-2xl font-bold text-white">IntelliPath</span>
@@ -226,13 +229,18 @@ export default function Auth() {
           {/* Card with glassmorphism */}
           <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur-xl">
             {/* Gradient border effect */}
-            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-teal-500/20 via-transparent to-cyan-500/20 pointer-events-none" />
+            <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-indigo-500/20 via-transparent to-purple-500/20 pointer-events-none" />
             
             {/* Animated glow */}
             <motion.div
-              className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-teal-500/30 blur-3xl"
+              className="absolute -top-20 -right-20 w-40 h-40 rounded-full bg-indigo-500/30 blur-3xl"
               animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
               transition={{ duration: 4, repeat: Infinity }}
+            />
+            <motion.div
+              className="absolute -bottom-20 -left-20 w-40 h-40 rounded-full bg-purple-500/30 blur-3xl"
+              animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
+              transition={{ duration: 4, repeat: Infinity, delay: 2 }}
             />
             
             <div className="relative z-10">
@@ -242,19 +250,19 @@ export default function Auth() {
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                  className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/30"
+                  className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/30"
                 >
                   <Sparkles className="h-8 w-8 text-white" />
                 </motion.div>
                 <h1 className="mb-2 text-2xl font-bold text-white">
                   {isLogin
-                    ? t('تسجيل الدخول', 'Sign In')
-                    : t('إنشاء حساب جديد', 'Create Account')}
+                    ? translate('auth.login.title')
+                    : translate('auth.register.title')}
                 </h1>
                 <p className="text-sm text-white/60">
                   {isLogin
-                    ? t('أدخل بياناتك للوصول إلى حسابك', 'Enter your credentials to access your account')
-                    : t('أنشئ حسابك للبدء في رحلتك الأكاديمية', 'Create your account to start your academic journey')}
+                    ? translate('auth.login.subtitle')
+                    : translate('auth.register.subtitle')}
                 </p>
               </div>
 
@@ -271,11 +279,11 @@ export default function Auth() {
                   {isLogin && (
                     <motion.div
                       layoutId="activeTab"
-                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500"
+                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600"
                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     />
                   )}
-                  <span className="relative z-10">{t('تسجيل الدخول', 'Login')}</span>
+                  <span className="relative z-10">{translate('auth.login.button')}</span>
                 </button>
                 <button
                   onClick={() => setIsLogin(false)}
@@ -288,7 +296,7 @@ export default function Auth() {
                   {!isLogin && (
                     <motion.div
                       layoutId="activeTab"
-                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-teal-500 to-cyan-500"
+                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-indigo-500 to-purple-600"
                       transition={{ type: "spring", stiffness: 300, damping: 30 }}
                     />
                   )}
@@ -309,14 +317,14 @@ export default function Auth() {
                     className="space-y-4"
                   >
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-white/80">{t('البريد الإلكتروني', 'Email')}</Label>
+                      <Label htmlFor="email" className="text-white/80">{translate('auth.login.email')}</Label>
                       <div className="relative group">
-                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-indigo-400 transition-colors rtl:left-3 rtl:right-auto" />
                         <Input
                           id="email"
                           type="email"
-                          placeholder={t('أدخل بريدك الإلكتروني', 'Enter your email')}
-                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          placeholder={translate('auth.login.emailPlaceholder')}
+                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-indigo-500/50 focus:ring-indigo-500/20"
                           value={loginForm.email}
                           onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                         />
@@ -327,14 +335,14 @@ export default function Auth() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="password" className="text-white/80">{t('كلمة المرور', 'Password')}</Label>
+                      <Label htmlFor="password" className="text-white/80">{translate('auth.login.password')}</Label>
                       <div className="relative group">
-                        <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-indigo-400 transition-colors rtl:left-3 rtl:right-auto" />
                         <Input
                           id="password"
                           type={showPassword ? 'text' : 'password'}
-                          placeholder={t('أدخل كلمة المرور', 'Enter your password')}
-                          className="pl-10 pr-10 rtl:pl-10 rtl:pr-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          placeholder={translate('auth.login.passwordPlaceholder')}
+                          className="pl-10 pr-10 rtl:pl-10 rtl:pr-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-indigo-500/50 focus:ring-indigo-500/20"
                           value={loginForm.password}
                           onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                         />
@@ -353,18 +361,29 @@ export default function Auth() {
 
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-medium shadow-lg shadow-teal-500/25 transition-all hover:shadow-teal-500/40"
+                      className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 hover:-translate-y-0.5"
                       disabled={isLoading}
                     >
                       {isLoading ? (
                         <>
                           <Loader2 className="ml-2 h-4 w-4 animate-spin rtl:ml-0 rtl:mr-2" />
-                          {t('جاري التحميل...', 'Loading...')}
+                          {translate('auth.login.loading')}
                         </>
                       ) : (
-                        t('تسجيل الدخول', 'Sign In')
+                        translate('auth.login.button')
                       )}
                     </Button>
+
+                    <div className="text-center text-sm text-white/50">
+                      <span>{translate('auth.login.noAccount')}</span>{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIsLogin(false)}
+                        className="text-indigo-400 hover:text-indigo-300 font-medium"
+                      >
+                        {translate('auth.login.createAccount')}
+                      </button>
+                    </div>
                   </motion.form>
                 ) : (
                   <motion.form
@@ -377,13 +396,13 @@ export default function Auth() {
                     className="space-y-4"
                   >
                     <div className="space-y-2">
-                      <Label htmlFor="fullName" className="text-white/80">{t('الاسم الكامل', 'Full Name')}</Label>
+                      <Label htmlFor="fullName" className="text-white/80">{translate('auth.register.fullName')}</Label>
                       <div className="relative group">
-                        <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <User className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-indigo-400 transition-colors rtl:left-3 rtl:right-auto" />
                         <Input
                           id="fullName"
-                          placeholder={t('أدخل اسمك الكامل', 'Enter your full name')}
-                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          placeholder={translate('auth.register.fullNamePlaceholder')}
+                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-indigo-500/50 focus:ring-indigo-500/20"
                           value={registerForm.fullName}
                           onChange={(e) => setRegisterForm({ ...registerForm, fullName: e.target.value })}
                         />
@@ -394,14 +413,14 @@ export default function Auth() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="regEmail" className="text-white/80">{t('البريد الإلكتروني', 'Email')}</Label>
+                      <Label htmlFor="regEmail" className="text-white/80">{translate('auth.register.email')}</Label>
                       <div className="relative group">
-                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Mail className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-indigo-400 transition-colors rtl:left-3 rtl:right-auto" />
                         <Input
                           id="regEmail"
                           type="email"
-                          placeholder={t('أدخل بريدك الإلكتروني', 'Enter your email')}
-                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
+                          placeholder={translate('auth.register.emailPlaceholder')}
+                          className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-indigo-500/50 focus:ring-indigo-500/20"
                           value={registerForm.email}
                           onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                         />
@@ -411,37 +430,32 @@ export default function Auth() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <Label htmlFor="studentId" className="text-white/80">{t('الرقم الجامعي', 'Student ID')}</Label>
-                        <div className="relative group">
-                          <GraduationCap className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
-                          <Input
-                            id="studentId"
-                            placeholder={t('الرقم', 'ID')}
-                            className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
-                            value={registerForm.studentId}
-                            onChange={(e) => setRegisterForm({ ...registerForm, studentId: e.target.value })}
-                          />
-                        </div>
+                        <Label htmlFor="studentId" className="text-white/80">{translate('auth.register.studentId')}</Label>
+                        <Input
+                          id="studentId"
+                          placeholder={translate('auth.register.studentIdPlaceholder')}
+                          className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-indigo-500/50 focus:ring-indigo-500/20"
+                          value={registerForm.studentId}
+                          onChange={(e) => setRegisterForm({ ...registerForm, studentId: e.target.value })}
+                        />
                         {errors.studentId && (
                           <p className="text-xs text-red-400">{errors.studentId}</p>
                         )}
                       </div>
-
                       <div className="space-y-2">
-                        <Label htmlFor="department" className="text-white/80">{t('القسم', 'Department')}</Label>
+                        <Label htmlFor="department" className="text-white/80">{translate('auth.register.department')}</Label>
                         <Select
                           value={registerForm.department}
                           onValueChange={(value) => setRegisterForm({ ...registerForm, department: value })}
                         >
-                          <SelectTrigger className="w-full bg-white/5 border-white/10 text-white focus:border-teal-500/50 focus:ring-teal-500/20">
-                            <Building2 className="h-4 w-4 text-white/40 me-2" />
-                            <SelectValue placeholder={t('اختر', 'Select')} />
+                          <SelectTrigger className="bg-white/5 border-white/10 text-white focus:border-indigo-500/50 focus:ring-indigo-500/20 [&>span]:text-white/60">
+                            <SelectValue placeholder={translate('auth.register.selectDepartment')} />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-800 border-white/10">
+                          <SelectContent className="bg-slate-900 border-white/10">
                             {departments.map((dept) => (
-                              <SelectItem key={dept.value} value={dept.value} className="text-white hover:bg-white/10">
+                              <SelectItem key={dept.value} value={dept.value} className="text-white focus:bg-indigo-500/20">
                                 {language === 'ar' ? dept.labelAr : dept.labelEn}
                               </SelectItem>
                             ))}
@@ -453,69 +467,74 @@ export default function Auth() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="regPassword" className="text-white/80">{t('كلمة المرور', 'Password')}</Label>
-                        <div className="relative group">
-                          <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
-                          <Input
-                            id="regPassword"
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••"
-                            className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
-                            value={registerForm.password}
-                            onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                          />
-                        </div>
-                        {errors.password && (
-                          <p className="text-xs text-red-400">{errors.password}</p>
-                        )}
+                    <div className="space-y-2">
+                      <Label htmlFor="regPassword" className="text-white/80">{translate('auth.register.password')}</Label>
+                      <div className="relative group">
+                        <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-indigo-400 transition-colors rtl:left-3 rtl:right-auto" />
+                        <Input
+                          id="regPassword"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder={translate('auth.login.passwordPlaceholder')}
+                          className="pl-10 pr-10 rtl:pl-10 rtl:pr-10 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-indigo-500/50 focus:ring-indigo-500/20"
+                          value={registerForm.password}
+                          onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 rtl:left-auto rtl:right-3"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
+                      {errors.password && (
+                        <p className="text-xs text-red-400">{errors.password}</p>
+                      )}
+                    </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="confirmPassword" className="text-white/80">{t('تأكيد', 'Confirm')}</Label>
-                        <div className="relative group">
-                          <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40 group-focus-within:text-teal-400 transition-colors rtl:left-3 rtl:right-auto" />
-                          <Input
-                            id="confirmPassword"
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••"
-                            className="pr-10 rtl:pl-10 rtl:pr-3 bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-teal-500/50 focus:ring-teal-500/20"
-                            value={registerForm.confirmPassword}
-                            onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
-                          />
-                        </div>
-                        {errors.confirmPassword && (
-                          <p className="text-xs text-red-400">{errors.confirmPassword}</p>
-                        )}
-                      </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword" className="text-white/80">{translate('auth.register.confirmPassword')}</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        placeholder={t('أعد إدخال كلمة المرور', 'Re-enter password')}
+                        className="bg-white/5 border-white/10 text-white placeholder:text-white/30 focus:border-indigo-500/50 focus:ring-indigo-500/20"
+                        value={registerForm.confirmPassword}
+                        onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
+                      />
+                      {errors.confirmPassword && (
+                        <p className="text-xs text-red-400">{errors.confirmPassword}</p>
+                      )}
                     </div>
 
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-medium shadow-lg shadow-teal-500/25 transition-all hover:shadow-teal-500/40"
+                      className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium shadow-lg shadow-indigo-500/25 transition-all hover:shadow-indigo-500/40 hover:-translate-y-0.5"
                       disabled={isLoading}
                     >
                       {isLoading ? (
                         <>
                           <Loader2 className="ml-2 h-4 w-4 animate-spin rtl:ml-0 rtl:mr-2" />
-                          {t('جاري التحميل...', 'Loading...')}
+                          {translate('auth.register.loading')}
                         </>
                       ) : (
-                        t('إنشاء الحساب', 'Create Account')
+                        translate('auth.register.button')
                       )}
                     </Button>
+
+                    <div className="text-center text-sm text-white/50">
+                      <span>{translate('auth.register.hasAccount')}</span>{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIsLogin(true)}
+                        className="text-indigo-400 hover:text-indigo-300 font-medium"
+                      >
+                        {translate('auth.register.loginLink')}
+                      </button>
+                    </div>
                   </motion.form>
                 )}
               </AnimatePresence>
-
-              {/* Footer */}
-              <p className="mt-6 text-center text-xs text-white/40">
-                {t(
-                  'بتسجيلك أنت توافق على شروط الاستخدام وسياسة الخصوصية',
-                  'By signing up, you agree to our Terms and Privacy Policy'
-                )}
-              </p>
             </div>
           </div>
         </motion.div>
