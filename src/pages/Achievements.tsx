@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Trophy, 
@@ -14,7 +14,10 @@ import {
   Gift,
   Lock,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  MessageSquare, 
+  Calendar,
+  Loader2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,19 +28,35 @@ import { Button } from '@/components/ui/button';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
 import { cn } from '@/lib/utils';
-import { celebrateAchievement, celebrateLevelUp, celebrateStars } from '@/utils/confetti';
+import { celebrateAchievement } from '@/utils/confetti';
+import { useAchievements } from '@/hooks/useAchievements';
 
-// Mock achievements data
-const achievements = [
-  { id: '1', name: 'طالب متميز', nameEn: 'Distinguished Student', description: 'حقق معدل 3.5 أو أعلى', descriptionEn: 'Achieve GPA 3.5 or higher', icon: Star, color: 'text-yellow-500', bgColor: 'bg-yellow-500/10', xp: 500, unlocked: true },
-  { id: '2', name: 'قارئ نهم', nameEn: 'Avid Reader', description: 'أكمل 10 محادثات مع المستشار', descriptionEn: 'Complete 10 advisor chats', icon: BookOpen, color: 'text-blue-500', bgColor: 'bg-blue-500/10', xp: 200, unlocked: true },
-  { id: '3', name: 'سلسلة 7 أيام', nameEn: '7 Day Streak', description: 'سجل دخولك 7 أيام متتالية', descriptionEn: 'Login 7 consecutive days', icon: Flame, color: 'text-orange-500', bgColor: 'bg-orange-500/10', xp: 150, unlocked: true },
-  { id: '4', name: 'المتفوق', nameEn: 'Top Performer', description: 'كن من أفضل 10 طلاب', descriptionEn: 'Be in top 10 students', icon: Crown, color: 'text-purple-500', bgColor: 'bg-purple-500/10', xp: 1000, unlocked: false },
-  { id: '5', name: 'المثابر', nameEn: 'Persistent', description: 'أكمل جميع مقررات الفصل', descriptionEn: 'Complete all semester courses', icon: Target, color: 'text-green-500', bgColor: 'bg-green-500/10', xp: 300, unlocked: false },
-  { id: '6', name: 'سريع البرق', nameEn: 'Lightning Fast', description: 'أنجز 5 واجبات قبل الموعد', descriptionEn: 'Submit 5 assignments early', icon: Zap, color: 'text-cyan-500', bgColor: 'bg-cyan-500/10', xp: 250, unlocked: true },
-  { id: '7', name: 'الخبير', nameEn: 'Expert', description: 'احصل على A في 5 مقررات', descriptionEn: 'Get A in 5 courses', icon: Award, color: 'text-amber-500', bgColor: 'bg-amber-500/10', xp: 400, unlocked: false },
-  { id: '8', name: 'المبتدئ', nameEn: 'Beginner', description: 'أكمل تسجيلك الأول', descriptionEn: 'Complete your first registration', icon: Gift, color: 'text-pink-500', bgColor: 'bg-pink-500/10', xp: 50, unlocked: true },
-];
+// Icon mapping for achievements
+const iconMap: Record<string, any> = {
+  star: Star,
+  book: BookOpen,
+  flame: Flame,
+  crown: Crown,
+  target: Target,
+  zap: Zap,
+  award: Award,
+  gift: Gift,
+  trophy: Trophy,
+  medal: Medal,
+};
+
+const colorMap: Record<string, { text: string; bg: string }> = {
+  primary: { text: 'text-primary', bg: 'bg-primary/10' },
+  yellow: { text: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+  blue: { text: 'text-blue-500', bg: 'bg-blue-500/10' },
+  orange: { text: 'text-orange-500', bg: 'bg-orange-500/10' },
+  purple: { text: 'text-purple-500', bg: 'bg-purple-500/10' },
+  green: { text: 'text-green-500', bg: 'bg-green-500/10' },
+  cyan: { text: 'text-cyan-500', bg: 'bg-cyan-500/10' },
+  amber: { text: 'text-amber-500', bg: 'bg-amber-500/10' },
+  pink: { text: 'text-pink-500', bg: 'bg-pink-500/10' },
+  red: { text: 'text-red-500', bg: 'bg-red-500/10' },
+};
 
 // Mock leaderboard data
 const leaderboard = [
@@ -46,9 +65,6 @@ const leaderboard = [
   { rank: 3, name: 'ليلى حسن', nameEn: 'Laila Hassan', xp: 4650, level: 15, avatar: '' },
   { rank: 4, name: 'أحمد خالد', nameEn: 'Ahmed Khaled', xp: 4200, level: 14, avatar: '' },
   { rank: 5, name: 'نور الدين', nameEn: 'Nour Eldin', xp: 3980, level: 13, avatar: '' },
-  { rank: 6, name: 'فاطمة محمد', nameEn: 'Fatima Mohammed', xp: 3750, level: 12, avatar: '' },
-  { rank: 7, name: 'عمر يوسف', nameEn: 'Omar Youssef', xp: 3500, level: 12, avatar: '' },
-  { rank: 8, name: 'رنا سعيد', nameEn: 'Rana Saeed', xp: 3200, level: 11, avatar: '' },
 ];
 
 // Mock weekly challenges
@@ -58,20 +74,18 @@ const weeklyChalllenges = [
   { id: '3', title: 'استعرض 5 مقررات', titleEn: 'View 5 courses', xp: 50, progress: 5, total: 5, completed: true, icon: BookOpen },
 ];
 
-import { MessageSquare, Calendar } from 'lucide-react';
-
 export default function Achievements() {
   const { t, language } = useLanguageStore();
   const [activeTab, setActiveTab] = useState('achievements');
+  const { achievements, studentData, unlockedCount, isLoading } = useAchievements();
 
-  // Current user stats
   const userStats = {
-    xp: 2450,
-    level: 12,
-    nextLevelXp: 3000,
+    xp: studentData?.xp_points || 0,
+    level: studentData?.level || 1,
+    nextLevelXp: ((studentData?.level || 1) + 1) * 500,
     rank: 15,
-    streak: 7,
-    totalAchievements: 5,
+    streak: studentData?.streak_days || 0,
+    totalAchievements: unlockedCount,
   };
 
   const xpProgress = (userStats.xp / userStats.nextLevelXp) * 100;
@@ -156,50 +170,61 @@ export default function Achievements() {
 
           {/* Achievements Tab */}
           <TabsContent value="achievements" className="mt-6">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {achievements.map((achievement, index) => (
-                <motion.div
-                  key={achievement.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: index * 0.05 }}
-                >
-                  <Card
-                    className={cn(
-                      'relative overflow-hidden transition-all hover-lift',
-                      !achievement.unlocked && 'opacity-60'
-                    )}
-                  >
-                    {!achievement.unlocked && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
-                        <Lock className="h-8 w-8 text-muted-foreground" />
-                      </div>
-                    )}
-                    <CardContent className="p-4">
-                      <div className="flex items-start gap-3">
-                        <div className={cn('rounded-xl p-3', achievement.bgColor)}>
-                          <achievement.icon className={cn('h-6 w-6', achievement.color)} />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-foreground">
-                            {language === 'ar' ? achievement.name : achievement.nameEn}
-                          </h3>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {language === 'ar' ? achievement.description : achievement.descriptionEn}
-                          </p>
-                          <Badge variant="secondary" className="mt-2 text-xs">
-                            +{achievement.xp} XP
-                          </Badge>
-                        </div>
-                      </div>
-                      {achievement.unlocked && (
-                        <CheckCircle2 className="absolute top-2 left-2 h-5 w-5 text-green-500 rtl:left-auto rtl:right-2" />
-                      )}
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {achievements.map((achievement, index) => {
+                  const IconComponent = iconMap[achievement.icon || 'trophy'] || Trophy;
+                  const colors = colorMap[achievement.badge_color || 'primary'] || colorMap.primary;
+                  
+                  return (
+                    <motion.div
+                      key={achievement.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: index * 0.05 }}
+                    >
+                      <Card
+                        className={cn(
+                          'relative overflow-hidden transition-all hover-lift',
+                          !achievement.unlocked && 'opacity-60'
+                        )}
+                      >
+                        {!achievement.unlocked && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+                            <Lock className="h-8 w-8 text-muted-foreground" />
+                          </div>
+                        )}
+                        <CardContent className="p-4">
+                          <div className="flex items-start gap-3">
+                            <div className={cn('rounded-xl p-3', colors.bg)}>
+                              <IconComponent className={cn('h-6 w-6', colors.text)} />
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-foreground">
+                                {language === 'ar' ? (achievement.name_ar || achievement.name) : achievement.name}
+                              </h3>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {language === 'ar' ? (achievement.description_ar || achievement.description) : achievement.description}
+                              </p>
+                              <Badge variant="secondary" className="mt-2 text-xs">
+                                +{achievement.xp_reward || 0} XP
+                              </Badge>
+                            </div>
+                          </div>
+                          {achievement.unlocked && (
+                            <CheckCircle2 className="absolute top-2 left-2 h-5 w-5 text-green-500 rtl:left-auto rtl:right-2" />
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
           </TabsContent>
 
           {/* Leaderboard Tab */}
