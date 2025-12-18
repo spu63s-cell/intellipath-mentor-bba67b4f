@@ -11,66 +11,57 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Users, BookOpen, Settings, Shield, Search, Plus, Edit, Trash2, 
-  BarChart3, Activity, Database, Bell, Lock, Globe, Palette,
-  Download, Upload, RefreshCw, CheckCircle, XCircle, AlertTriangle
+  BarChart3, Activity, Database, Bell, Lock, Globe,
+  Download, RefreshCw, CheckCircle, XCircle, AlertTriangle, Send
 } from 'lucide-react';
 import { useLanguageStore } from '@/stores/languageStore';
+import { useAdminUsers, useAdminCourses, useSendNotification } from '@/hooks/useAdminData';
 import { toast } from 'sonner';
 
 const Admin = () => {
-  const { language } = useLanguageStore();
+  const { language, t } = useLanguageStore();
   const isRTL = language === 'ar';
   
+  const { users, isLoading: usersLoading, updateUserRole } = useAdminUsers();
+  const { courses, isLoading: coursesLoading, addCourse, deleteCourse } = useAdminCourses();
+  const { sendNotification, sendBulkNotifications } = useSendNotification();
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
-  const [isAddUserOpen, setIsAddUserOpen] = useState(false);
   const [isAddCourseOpen, setIsAddCourseOpen] = useState(false);
+  const [isNotifyOpen, setIsNotifyOpen] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
 
-  // Mock data
-  const users = [
-    { id: 1, name: 'أحمد محمد', email: 'ahmed@spu.edu.sy', role: 'student', status: 'active', department: 'هندسة المعلوماتية', joinDate: '2024-01-15' },
-    { id: 2, name: 'سارة علي', email: 'sara@spu.edu.sy', role: 'student', status: 'active', department: 'هندسة الاتصالات', joinDate: '2024-02-20' },
-    { id: 3, name: 'د. خالد حسن', email: 'khaled@spu.edu.sy', role: 'advisor', status: 'active', department: 'هندسة المعلوماتية', joinDate: '2023-09-01' },
-    { id: 4, name: 'م. فاطمة أحمد', email: 'fatima@spu.edu.sy', role: 'advisor', status: 'inactive', department: 'هندسة العمارة', joinDate: '2023-10-15' },
-    { id: 5, name: 'مدير النظام', email: 'admin@spu.edu.sy', role: 'admin', status: 'active', department: 'إدارة النظام', joinDate: '2023-01-01' },
-  ];
+  // New course form state
+  const [newCourse, setNewCourse] = useState({
+    code: '',
+    name: '',
+    name_ar: '',
+    department: '',
+    credits: 3,
+  });
 
-  const courses = [
-    { id: 1, code: 'CS101', name: 'مقدمة في البرمجة', department: 'هندسة المعلوماتية', credits: 3, students: 45, status: 'active' },
-    { id: 2, code: 'CS201', name: 'هياكل البيانات', department: 'هندسة المعلوماتية', credits: 3, students: 38, status: 'active' },
-    { id: 3, code: 'EE101', name: 'الدارات الكهربائية', department: 'هندسة الاتصالات', credits: 4, students: 52, status: 'active' },
-    { id: 4, code: 'AR101', name: 'التصميم المعماري', department: 'هندسة العمارة', credits: 4, students: 30, status: 'inactive' },
-  ];
+  // Notification form state
+  const [notification, setNotification] = useState({
+    title: '',
+    title_ar: '',
+    message: '',
+    message_ar: '',
+    type: 'info',
+  });
 
   const stats = [
-    { label: 'إجمالي المستخدمين', value: '1,234', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
-    { label: 'المقررات النشطة', value: '156', icon: BookOpen, color: 'text-green-500', bg: 'bg-green-500/10' },
-    { label: 'المشرفين', value: '45', icon: Shield, color: 'text-purple-500', bg: 'bg-purple-500/10' },
-    { label: 'الجلسات النشطة', value: '89', icon: Activity, color: 'text-orange-500', bg: 'bg-orange-500/10' },
+    { label: 'إجمالي المستخدمين', value: users.length.toString(), icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+    { label: 'المقررات النشطة', value: courses.filter(c => c.is_active).length.toString(), icon: BookOpen, color: 'text-green-500', bg: 'bg-green-500/10' },
+    { label: 'المشرفين', value: users.filter(u => u.role === 'advisor').length.toString(), icon: Shield, color: 'text-purple-500', bg: 'bg-purple-500/10' },
+    { label: 'الطلاب', value: users.filter(u => u.role === 'student').length.toString(), icon: Activity, color: 'text-orange-500', bg: 'bg-orange-500/10' },
   ];
 
-  const systemSettings = {
-    general: [
-      { key: 'site_name', label: 'اسم الموقع', value: 'IntelliPath', type: 'text' },
-      { key: 'default_language', label: 'اللغة الافتراضية', value: 'ar', type: 'select', options: ['ar', 'en'] },
-      { key: 'maintenance_mode', label: 'وضع الصيانة', value: false, type: 'switch' },
-    ],
-    security: [
-      { key: 'two_factor', label: 'المصادقة الثنائية', value: true, type: 'switch' },
-      { key: 'session_timeout', label: 'مهلة الجلسة (دقائق)', value: '30', type: 'number' },
-      { key: 'max_login_attempts', label: 'محاولات تسجيل الدخول', value: '5', type: 'number' },
-    ],
-    notifications: [
-      { key: 'email_notifications', label: 'إشعارات البريد', value: true, type: 'switch' },
-      { key: 'push_notifications', label: 'الإشعارات الفورية', value: true, type: 'switch' },
-      { key: 'weekly_reports', label: 'التقارير الأسبوعية', value: false, type: 'switch' },
-    ],
-  };
-
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.includes(searchQuery) || user.email.includes(searchQuery);
+    const matchesSearch = user.full_name.includes(searchQuery) || user.email.includes(searchQuery);
     const matchesRole = selectedRole === 'all' || user.role === selectedRole;
     return matchesSearch && matchesRole;
   });
@@ -85,18 +76,53 @@ const Admin = () => {
     return <Badge variant="outline" className={styles[role as keyof typeof styles]}>{labels[role as keyof typeof labels]}</Badge>;
   };
 
-  const getStatusBadge = (status: string) => {
-    return status === 'active' 
-      ? <Badge className="bg-green-500/10 text-green-500 border-green-500/20"><CheckCircle className="w-3 h-3 ml-1" />نشط</Badge>
-      : <Badge className="bg-red-500/10 text-red-500 border-red-500/20"><XCircle className="w-3 h-3 ml-1" />غير نشط</Badge>;
+  const handleAddCourse = async () => {
+    if (!newCourse.code || !newCourse.name || !newCourse.department) {
+      toast.error('الرجاء ملء جميع الحقول المطلوبة');
+      return;
+    }
+    try {
+      await addCourse(newCourse);
+      setIsAddCourseOpen(false);
+      setNewCourse({ code: '', name: '', name_ar: '', department: '', credits: 3 });
+    } catch (error) {
+      // Error handled in hook
+    }
   };
 
-  const handleDeleteUser = (id: number) => {
-    toast.success('تم حذف المستخدم بنجاح');
+  const handleSendNotification = async () => {
+    if (!notification.title || !notification.message) {
+      toast.error('الرجاء ملء عنوان ورسالة الإشعار');
+      return;
+    }
+    
+    if (selectedUsers.length === 0) {
+      toast.error('الرجاء اختيار مستخدم واحد على الأقل');
+      return;
+    }
+
+    try {
+      await sendBulkNotifications(selectedUsers, notification);
+      setIsNotifyOpen(false);
+      setSelectedUsers([]);
+      setNotification({ title: '', title_ar: '', message: '', message_ar: '', type: 'info' });
+    } catch (error) {
+      // Error handled in hook
+    }
   };
 
-  const handleDeleteCourse = (id: number) => {
-    toast.success('تم حذف المقرر بنجاح');
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUsers(prev =>
+      prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+    );
+  };
+
+  const selectAllUsers = () => {
+    if (selectedUsers.length === filteredUsers.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(filteredUsers.map(u => u.user_id));
+    }
   };
 
   return (
@@ -110,18 +136,62 @@ const Admin = () => {
           {/* Header */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold text-foreground">لوحة تحكم المدير</h1>
-              <p className="text-muted-foreground mt-1">إدارة المستخدمين والمقررات وإعدادات النظام</p>
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground">{t('لوحة تحكم المدير', 'Admin Dashboard')}</h1>
+              <p className="text-muted-foreground mt-1">{t('إدارة المستخدمين والمقررات وإعدادات النظام', 'Manage users, courses, and system settings')}</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 ml-2" />
-                تصدير البيانات
-              </Button>
-              <Button variant="outline" size="sm">
-                <RefreshCw className="w-4 h-4 ml-2" />
-                تحديث
-              </Button>
+              <Dialog open={isNotifyOpen} onOpenChange={setIsNotifyOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={selectedUsers.length === 0}>
+                    <Send className="w-4 h-4 ml-2" />
+                    {t('إرسال إشعار', 'Send Notification')} ({selectedUsers.length})
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{t('إرسال إشعار جماعي', 'Send Bulk Notification')}</DialogTitle>
+                    <DialogDescription>{t('سيتم إرسال الإشعار للمستخدمين المحددين', 'Notification will be sent to selected users')}</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>{t('العنوان (عربي)', 'Title (Arabic)')}</Label>
+                      <Input 
+                        value={notification.title_ar}
+                        onChange={(e) => setNotification(prev => ({ ...prev, title_ar: e.target.value, title: e.target.value }))}
+                        placeholder="عنوان الإشعار"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t('الرسالة (عربي)', 'Message (Arabic)')}</Label>
+                      <Input 
+                        value={notification.message_ar}
+                        onChange={(e) => setNotification(prev => ({ ...prev, message_ar: e.target.value, message: e.target.value }))}
+                        placeholder="نص الإشعار"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>{t('النوع', 'Type')}</Label>
+                      <Select value={notification.type} onValueChange={(v) => setNotification(prev => ({ ...prev, type: v }))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="info">{t('معلومات', 'Info')}</SelectItem>
+                          <SelectItem value="warning">{t('تحذير', 'Warning')}</SelectItem>
+                          <SelectItem value="success">{t('نجاح', 'Success')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsNotifyOpen(false)}>{t('إلغاء', 'Cancel')}</Button>
+                    <Button onClick={handleSendNotification}>
+                      <Send className="w-4 h-4 ml-2" />
+                      {t('إرسال', 'Send')}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
 
@@ -156,19 +226,15 @@ const Admin = () => {
             <TabsList className="bg-muted/50 p-1">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                المستخدمين
+                {t('المستخدمين', 'Users')}
               </TabsTrigger>
               <TabsTrigger value="courses" className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" />
-                المقررات
+                {t('المقررات', 'Courses')}
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
-                الإعدادات
-              </TabsTrigger>
-              <TabsTrigger value="logs" className="flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                السجلات
+                {t('الإعدادات', 'Settings')}
               </TabsTrigger>
             </TabsList>
 
@@ -178,65 +244,9 @@ const Admin = () => {
                 <CardHeader>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                      <CardTitle>إدارة المستخدمين</CardTitle>
-                      <CardDescription>عرض وإدارة جميع مستخدمي النظام</CardDescription>
+                      <CardTitle>{t('إدارة المستخدمين', 'User Management')}</CardTitle>
+                      <CardDescription>{t('عرض وإدارة جميع مستخدمي النظام', 'View and manage all system users')}</CardDescription>
                     </div>
-                    <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-                      <DialogTrigger asChild>
-                        <Button>
-                          <Plus className="w-4 h-4 ml-2" />
-                          إضافة مستخدم
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>إضافة مستخدم جديد</DialogTitle>
-                          <DialogDescription>أدخل بيانات المستخدم الجديد</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label>الاسم الكامل</Label>
-                            <Input placeholder="أدخل الاسم" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>البريد الإلكتروني</Label>
-                            <Input type="email" placeholder="email@spu.edu.sy" />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>الدور</Label>
-                            <Select>
-                              <SelectTrigger>
-                                <SelectValue placeholder="اختر الدور" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="student">طالب</SelectItem>
-                                <SelectItem value="advisor">مشرف</SelectItem>
-                                <SelectItem value="admin">مدير</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <Label>القسم</Label>
-                            <Select>
-                              <SelectTrigger>
-                                <SelectValue placeholder="اختر القسم" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="cs">هندسة المعلوماتية</SelectItem>
-                                <SelectItem value="ee">هندسة الاتصالات</SelectItem>
-                                <SelectItem value="arch">هندسة العمارة</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsAddUserOpen(false)}>إلغاء</Button>
-                          <Button onClick={() => { setIsAddUserOpen(false); toast.success('تم إضافة المستخدم بنجاح'); }}>
-                            إضافة
-                          </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -245,7 +255,7 @@ const Admin = () => {
                     <div className="relative flex-1">
                       <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
-                        placeholder="البحث عن مستخدم..."
+                        placeholder={t('البحث عن مستخدم...', 'Search users...')}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="pr-10"
@@ -253,63 +263,79 @@ const Admin = () => {
                     </div>
                     <Select value={selectedRole} onValueChange={setSelectedRole}>
                       <SelectTrigger className="w-full md:w-40">
-                        <SelectValue placeholder="الدور" />
+                        <SelectValue placeholder={t('الدور', 'Role')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">الكل</SelectItem>
-                        <SelectItem value="student">طلاب</SelectItem>
-                        <SelectItem value="advisor">مشرفين</SelectItem>
-                        <SelectItem value="admin">مدراء</SelectItem>
+                        <SelectItem value="all">{t('الكل', 'All')}</SelectItem>
+                        <SelectItem value="student">{t('طلاب', 'Students')}</SelectItem>
+                        <SelectItem value="advisor">{t('مشرفين', 'Advisors')}</SelectItem>
+                        <SelectItem value="admin">{t('مدراء', 'Admins')}</SelectItem>
                       </SelectContent>
                     </Select>
+                    <Button variant="outline" size="sm" onClick={selectAllUsers}>
+                      {selectedUsers.length === filteredUsers.length ? t('إلغاء التحديد', 'Deselect All') : t('تحديد الكل', 'Select All')}
+                    </Button>
                   </div>
 
                   {/* Users Table */}
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="text-right">المستخدم</TableHead>
-                          <TableHead className="text-right">الدور</TableHead>
-                          <TableHead className="text-right">القسم</TableHead>
-                          <TableHead className="text-right">الحالة</TableHead>
-                          <TableHead className="text-right">تاريخ الانضمام</TableHead>
-                          <TableHead className="text-right">الإجراءات</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredUsers.map((user) => (
-                          <TableRow key={user.id} className="hover:bg-muted/30">
-                            <TableCell>
-                              <div>
-                                <p className="font-medium text-foreground">{user.name}</p>
-                                <p className="text-sm text-muted-foreground">{user.email}</p>
-                              </div>
-                            </TableCell>
-                            <TableCell>{getRoleBadge(user.role)}</TableCell>
-                            <TableCell className="text-muted-foreground">{user.department}</TableCell>
-                            <TableCell>{getStatusBadge(user.status)}</TableCell>
-                            <TableCell className="text-muted-foreground">{user.joinDate}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <Edit className="w-4 h-4" />
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-8 w-8 text-red-500 hover:text-red-600"
-                                  onClick={() => handleDeleteUser(user.id)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
+                  {usersLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map(i => (
+                        <Skeleton key={i} className="h-16 w-full" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-right w-10"></TableHead>
+                            <TableHead className="text-right">{t('المستخدم', 'User')}</TableHead>
+                            <TableHead className="text-right">{t('الدور', 'Role')}</TableHead>
+                            <TableHead className="text-right">{t('القسم', 'Department')}</TableHead>
+                            <TableHead className="text-right">{t('الإجراءات', 'Actions')}</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredUsers.map((user) => (
+                            <TableRow key={user.id} className="hover:bg-muted/30">
+                              <TableCell>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedUsers.includes(user.user_id)}
+                                  onChange={() => toggleUserSelection(user.user_id)}
+                                  className="rounded border-border"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium text-foreground">{user.full_name}</p>
+                                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell>{getRoleBadge(user.role)}</TableCell>
+                              <TableCell className="text-muted-foreground">{user.department || '-'}</TableCell>
+                              <TableCell>
+                                <Select 
+                                  value={user.role} 
+                                  onValueChange={(value) => updateUserRole(user.user_id, value as 'student' | 'advisor' | 'admin')}
+                                >
+                                  <SelectTrigger className="w-28 h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="student">{t('طالب', 'Student')}</SelectItem>
+                                    <SelectItem value="advisor">{t('مشرف', 'Advisor')}</SelectItem>
+                                    <SelectItem value="admin">{t('مدير', 'Admin')}</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -320,54 +346,76 @@ const Admin = () => {
                 <CardHeader>
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div>
-                      <CardTitle>إدارة المقررات</CardTitle>
-                      <CardDescription>عرض وإدارة جميع المقررات الدراسية</CardDescription>
+                      <CardTitle>{t('إدارة المقررات', 'Course Management')}</CardTitle>
+                      <CardDescription>{t('عرض وإدارة جميع المقررات الدراسية', 'View and manage all courses')}</CardDescription>
                     </div>
                     <Dialog open={isAddCourseOpen} onOpenChange={setIsAddCourseOpen}>
                       <DialogTrigger asChild>
                         <Button>
                           <Plus className="w-4 h-4 ml-2" />
-                          إضافة مقرر
+                          {t('إضافة مقرر', 'Add Course')}
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
                         <DialogHeader>
-                          <DialogTitle>إضافة مقرر جديد</DialogTitle>
-                          <DialogDescription>أدخل بيانات المقرر الجديد</DialogDescription>
+                          <DialogTitle>{t('إضافة مقرر جديد', 'Add New Course')}</DialogTitle>
+                          <DialogDescription>{t('أدخل بيانات المقرر الجديد', 'Enter new course details')}</DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 py-4">
                           <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
-                              <Label>رمز المقرر</Label>
-                              <Input placeholder="CS101" />
+                              <Label>{t('رمز المقرر', 'Course Code')}</Label>
+                              <Input 
+                                placeholder="CS101"
+                                value={newCourse.code}
+                                onChange={(e) => setNewCourse(prev => ({ ...prev, code: e.target.value }))}
+                              />
                             </div>
                             <div className="space-y-2">
-                              <Label>عدد الساعات</Label>
-                              <Input type="number" placeholder="3" />
+                              <Label>{t('عدد الساعات', 'Credits')}</Label>
+                              <Input 
+                                type="number" 
+                                placeholder="3"
+                                value={newCourse.credits}
+                                onChange={(e) => setNewCourse(prev => ({ ...prev, credits: parseInt(e.target.value) || 3 }))}
+                              />
                             </div>
                           </div>
                           <div className="space-y-2">
-                            <Label>اسم المقرر</Label>
-                            <Input placeholder="أدخل اسم المقرر" />
+                            <Label>{t('اسم المقرر (إنجليزي)', 'Course Name (English)')}</Label>
+                            <Input 
+                              placeholder="Introduction to Programming"
+                              value={newCourse.name}
+                              onChange={(e) => setNewCourse(prev => ({ ...prev, name: e.target.value }))}
+                            />
                           </div>
                           <div className="space-y-2">
-                            <Label>القسم</Label>
-                            <Select>
+                            <Label>{t('اسم المقرر (عربي)', 'Course Name (Arabic)')}</Label>
+                            <Input 
+                              placeholder="مقدمة في البرمجة"
+                              value={newCourse.name_ar}
+                              onChange={(e) => setNewCourse(prev => ({ ...prev, name_ar: e.target.value }))}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>{t('القسم', 'Department')}</Label>
+                            <Select value={newCourse.department} onValueChange={(v) => setNewCourse(prev => ({ ...prev, department: v }))}>
                               <SelectTrigger>
-                                <SelectValue placeholder="اختر القسم" />
+                                <SelectValue placeholder={t('اختر القسم', 'Select Department')} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="cs">هندسة المعلوماتية</SelectItem>
-                                <SelectItem value="ee">هندسة الاتصالات</SelectItem>
-                                <SelectItem value="arch">هندسة العمارة</SelectItem>
+                                <SelectItem value="هندسة المعلوماتية">هندسة المعلوماتية</SelectItem>
+                                <SelectItem value="هندسة الاتصالات">هندسة الاتصالات</SelectItem>
+                                <SelectItem value="هندسة العمارة">هندسة العمارة</SelectItem>
+                                <SelectItem value="هندسة الميكاترونيكس">هندسة الميكاترونيكس</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
                         <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsAddCourseOpen(false)}>إلغاء</Button>
-                          <Button onClick={() => { setIsAddCourseOpen(false); toast.success('تم إضافة المقرر بنجاح'); }}>
-                            إضافة
+                          <Button variant="outline" onClick={() => setIsAddCourseOpen(false)}>{t('إلغاء', 'Cancel')}</Button>
+                          <Button onClick={handleAddCourse}>
+                            {t('إضافة', 'Add')}
                           </Button>
                         </DialogFooter>
                       </DialogContent>
@@ -375,48 +423,68 @@ const Admin = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="text-right">رمز المقرر</TableHead>
-                          <TableHead className="text-right">اسم المقرر</TableHead>
-                          <TableHead className="text-right">القسم</TableHead>
-                          <TableHead className="text-right">الساعات</TableHead>
-                          <TableHead className="text-right">الطلاب</TableHead>
-                          <TableHead className="text-right">الحالة</TableHead>
-                          <TableHead className="text-right">الإجراءات</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {courses.map((course) => (
-                          <TableRow key={course.id} className="hover:bg-muted/30">
-                            <TableCell className="font-mono font-medium">{course.code}</TableCell>
-                            <TableCell className="font-medium text-foreground">{course.name}</TableCell>
-                            <TableCell className="text-muted-foreground">{course.department}</TableCell>
-                            <TableCell>{course.credits}</TableCell>
-                            <TableCell>{course.students}</TableCell>
-                            <TableCell>{getStatusBadge(course.status)}</TableCell>
-                            <TableCell>
-                              <div className="flex gap-2">
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                  <Edit className="w-4 h-4" />
-                                </Button>
+                  {coursesLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map(i => (
+                        <Skeleton key={i} className="h-16 w-full" />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead className="text-right">{t('رمز المقرر', 'Code')}</TableHead>
+                            <TableHead className="text-right">{t('اسم المقرر', 'Name')}</TableHead>
+                            <TableHead className="text-right">{t('القسم', 'Department')}</TableHead>
+                            <TableHead className="text-right">{t('الساعات', 'Credits')}</TableHead>
+                            <TableHead className="text-right">{t('الحالة', 'Status')}</TableHead>
+                            <TableHead className="text-right">{t('الإجراءات', 'Actions')}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {courses.map((course) => (
+                            <TableRow key={course.id} className="hover:bg-muted/30">
+                              <TableCell className="font-mono font-medium">{course.code}</TableCell>
+                              <TableCell className="font-medium text-foreground">
+                                {isRTL && course.name_ar ? course.name_ar : course.name}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">{course.department}</TableCell>
+                              <TableCell>{course.credits}</TableCell>
+                              <TableCell>
+                                {course.is_active ? (
+                                  <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                                    <CheckCircle className="w-3 h-3 ml-1" />{t('نشط', 'Active')}
+                                  </Badge>
+                                ) : (
+                                  <Badge className="bg-red-500/10 text-red-500 border-red-500/20">
+                                    <XCircle className="w-3 h-3 ml-1" />{t('غير نشط', 'Inactive')}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
                                 <Button 
                                   variant="ghost" 
                                   size="icon" 
                                   className="h-8 w-8 text-red-500 hover:text-red-600"
-                                  onClick={() => handleDeleteCourse(course.id)}
+                                  onClick={() => deleteCourse(course.id)}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {courses.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                {t('لا توجد مقررات', 'No courses found')}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -424,121 +492,89 @@ const Admin = () => {
             {/* Settings Tab */}
             <TabsContent value="settings">
               <div className="grid md:grid-cols-3 gap-6">
-                {/* General Settings */}
                 <Card className="bg-card/50 backdrop-blur-sm border-border/50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Globe className="w-5 h-5 text-blue-500" />
-                      إعدادات عامة
+                      {t('إعدادات عامة', 'General Settings')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {systemSettings.general.map((setting) => (
-                      <div key={setting.key} className="flex items-center justify-between">
-                        <Label>{setting.label}</Label>
-                        {setting.type === 'switch' ? (
-                          <Switch defaultChecked={setting.value as boolean} />
-                        ) : setting.type === 'select' ? (
-                          <Select defaultValue={setting.value as string}>
-                            <SelectTrigger className="w-24">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {setting.options?.map((opt) => (
-                                <SelectItem key={opt} value={opt}>{opt === 'ar' ? 'عربي' : 'English'}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Input defaultValue={setting.value as string} className="w-32" />
-                        )}
-                      </div>
-                    ))}
+                    <div className="flex items-center justify-between">
+                      <Label>{t('اسم الموقع', 'Site Name')}</Label>
+                      <Input defaultValue="IntelliPath" className="w-32" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>{t('اللغة الافتراضية', 'Default Language')}</Label>
+                      <Select defaultValue="ar">
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ar">عربي</SelectItem>
+                          <SelectItem value="en">English</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>{t('وضع الصيانة', 'Maintenance Mode')}</Label>
+                      <Switch />
+                    </div>
                   </CardContent>
                 </Card>
 
-                {/* Security Settings */}
                 <Card className="bg-card/50 backdrop-blur-sm border-border/50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Lock className="w-5 h-5 text-red-500" />
-                      إعدادات الأمان
+                      {t('إعدادات الأمان', 'Security Settings')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {systemSettings.security.map((setting) => (
-                      <div key={setting.key} className="flex items-center justify-between">
-                        <Label>{setting.label}</Label>
-                        {setting.type === 'switch' ? (
-                          <Switch defaultChecked={setting.value as boolean} />
-                        ) : (
-                          <Input type="number" defaultValue={setting.value as string} className="w-20" />
-                        )}
-                      </div>
-                    ))}
+                    <div className="flex items-center justify-between">
+                      <Label>{t('المصادقة الثنائية', 'Two-Factor Auth')}</Label>
+                      <Switch defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>{t('مهلة الجلسة (دقائق)', 'Session Timeout')}</Label>
+                      <Input type="number" defaultValue="30" className="w-20" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>{t('محاولات تسجيل الدخول', 'Login Attempts')}</Label>
+                      <Input type="number" defaultValue="5" className="w-20" />
+                    </div>
                   </CardContent>
                 </Card>
 
-                {/* Notification Settings */}
                 <Card className="bg-card/50 backdrop-blur-sm border-border/50">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Bell className="w-5 h-5 text-yellow-500" />
-                      إعدادات الإشعارات
+                      {t('إعدادات الإشعارات', 'Notification Settings')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {systemSettings.notifications.map((setting) => (
-                      <div key={setting.key} className="flex items-center justify-between">
-                        <Label>{setting.label}</Label>
-                        <Switch defaultChecked={setting.value as boolean} />
-                      </div>
-                    ))}
+                    <div className="flex items-center justify-between">
+                      <Label>{t('إشعارات البريد', 'Email Notifications')}</Label>
+                      <Switch defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>{t('الإشعارات الفورية', 'Push Notifications')}</Label>
+                      <Switch defaultChecked />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label>{t('التقارير الأسبوعية', 'Weekly Reports')}</Label>
+                      <Switch />
+                    </div>
                   </CardContent>
                 </Card>
               </div>
 
               <div className="mt-6 flex justify-end">
-                <Button onClick={() => toast.success('تم حفظ الإعدادات بنجاح')}>
-                  حفظ الإعدادات
+                <Button onClick={() => toast.success(t('تم حفظ الإعدادات بنجاح', 'Settings saved successfully'))}>
+                  {t('حفظ الإعدادات', 'Save Settings')}
                 </Button>
               </div>
-            </TabsContent>
-
-            {/* Logs Tab */}
-            <TabsContent value="logs">
-              <Card className="bg-card/50 backdrop-blur-sm border-border/50">
-                <CardHeader>
-                  <CardTitle>سجلات النظام</CardTitle>
-                  <CardDescription>عرض آخر الأنشطة والأحداث في النظام</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {[
-                      { type: 'info', message: 'تم تسجيل دخول المستخدم ahmed@spu.edu.sy', time: 'منذ 5 دقائق' },
-                      { type: 'success', message: 'تم إضافة مقرر جديد CS301', time: 'منذ 15 دقيقة' },
-                      { type: 'warning', message: 'محاولة تسجيل دخول فاشلة من IP: 192.168.1.100', time: 'منذ 30 دقيقة' },
-                      { type: 'info', message: 'تم تحديث بيانات الطالب #12345', time: 'منذ ساعة' },
-                      { type: 'error', message: 'فشل في إرسال إشعار البريد الإلكتروني', time: 'منذ ساعتين' },
-                      { type: 'success', message: 'تم إنشاء نسخة احتياطية من قاعدة البيانات', time: 'منذ 3 ساعات' },
-                    ].map((log, index) => (
-                      <div 
-                        key={index} 
-                        className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                      >
-                        {log.type === 'info' && <Activity className="w-5 h-5 text-blue-500 mt-0.5" />}
-                        {log.type === 'success' && <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />}
-                        {log.type === 'warning' && <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5" />}
-                        {log.type === 'error' && <XCircle className="w-5 h-5 text-red-500 mt-0.5" />}
-                        <div className="flex-1">
-                          <p className="text-sm text-foreground">{log.message}</p>
-                          <p className="text-xs text-muted-foreground mt-1">{log.time}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
             </TabsContent>
           </Tabs>
         </motion.div>
