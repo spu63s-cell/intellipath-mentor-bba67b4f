@@ -10,6 +10,8 @@ import {
   Settings,
   Shield,
   Users,
+  Lightbulb,
+  Calculator,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -64,6 +66,18 @@ const studentNavItems = [
     titleEn: 'Career Path',
     icon: Target,
     url: '/career',
+  },
+  {
+    titleAr: 'أسلوب التعلم',
+    titleEn: 'Learning Style',
+    icon: Lightbulb,
+    url: '/learning-style',
+  },
+  {
+    titleAr: 'محاكي القرارات',
+    titleEn: 'Simulator',
+    icon: Calculator,
+    url: '/simulator',
   },
 ];
 

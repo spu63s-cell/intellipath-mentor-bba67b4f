@@ -9,6 +9,7 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useLanguageStore } from '@/stores/languageStore';
 
 // Pages
+import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
 import Chat from '@/pages/Chat';
@@ -17,6 +18,8 @@ import Achievements from '@/pages/Achievements';
 import Courses from '@/pages/Courses';
 import Profile from '@/pages/Profile';
 import Career from '@/pages/Career';
+import LearningStyle from '@/pages/LearningStyle';
+import DecisionSimulator from '@/pages/DecisionSimulator';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -31,7 +34,7 @@ function AppContent() {
 
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
       <Route
         path="/dashboard"
@@ -41,7 +44,6 @@ function AppContent() {
           </ProtectedRoute>
         }
       />
-      {/* Chat with AI Advisor */}
       <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
       <Route path="/knowledge-graph" element={<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>} />
       <Route path="/achievements" element={<ProtectedRoute><Achievements /></ProtectedRoute>} />
@@ -49,6 +51,8 @@ function AppContent() {
       <Route path="/career" element={<ProtectedRoute><Career /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/learning-style" element={<ProtectedRoute><LearningStyle /></ProtectedRoute>} />
+      <Route path="/simulator" element={<ProtectedRoute><DecisionSimulator /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
