@@ -125,9 +125,12 @@ export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { state } = useSidebar();
-  const { t } = useLanguageStore();
+  const { t, language } = useLanguageStore();
   const { userRole } = useAuthStore();
   const collapsed = state === 'collapsed';
+
+  // RTL: sidebar on right, LTR: sidebar on left
+  const sidebarSide = language === 'ar' ? 'right' : 'left';
 
   const isActive = (url: string) => location.pathname === url;
 
@@ -161,8 +164,9 @@ export function AppSidebar() {
 
   return (
     <Sidebar
+      side={sidebarSide}
       collapsible="icon"
-      className="border-l-0 border-r border-sidebar-border rtl:border-l rtl:border-r-0"
+      className="border-sidebar-border"
     >
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
