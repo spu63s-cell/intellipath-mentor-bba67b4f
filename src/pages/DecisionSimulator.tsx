@@ -6,30 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguageStore } from '@/stores/languageStore';
+import { useSimulatorData, Course } from '@/hooks/useSimulatorData';
 import { 
   Calculator, TrendingUp, TrendingDown, AlertTriangle, 
-  CheckCircle2, RotateCcw, BookOpen, GraduationCap, Calendar
+  CheckCircle2, RotateCcw, BookOpen, GraduationCap, Calendar, Loader2
 } from 'lucide-react';
 
-interface SimulationCourse {
-  id: string;
-  name: string;
-  nameEn: string;
-  credits: number;
+interface SimulationCourse extends Course {
   expectedGrade: number;
 }
-
-const availableCourses = [
-  { id: '1', name: 'هياكل البيانات المتقدمة', nameEn: 'Advanced Data Structures', credits: 3 },
-  { id: '2', name: 'الذكاء الاصطناعي', nameEn: 'Artificial Intelligence', credits: 3 },
-  { id: '3', name: 'قواعد البيانات المتقدمة', nameEn: 'Advanced Databases', credits: 3 },
-  { id: '4', name: 'هندسة البرمجيات', nameEn: 'Software Engineering', credits: 3 },
-  { id: '5', name: 'الشبكات الحاسوبية', nameEn: 'Computer Networks', credits: 3 },
-  { id: '6', name: 'أمن المعلومات', nameEn: 'Information Security', credits: 3 },
-  { id: '7', name: 'تعلم الآلة', nameEn: 'Machine Learning', credits: 3 },
-  { id: '8', name: 'تطوير تطبيقات الويب', nameEn: 'Web Application Development', credits: 3 },
-];
 
 const gradeToPoints: Record<string, number> = {
   'A+': 4.0, 'A': 4.0, 'A-': 3.7,
@@ -55,15 +42,12 @@ const pointsToGrade = (points: number): string => {
 export default function DecisionSimulator() {
   const { language } = useLanguageStore();
   const isRTL = language === 'ar';
+  const { availableCourses, currentGpa, completedCredits, isLoading } = useSimulatorData();
 
-  // Current student stats (mock data)
-  const [currentGPA] = useState(3.2);
-  const [completedCredits] = useState(75);
   const totalRequiredCredits = 132;
 
   // Simulation state
   const [selectedCourses, setSelectedCourses] = useState<SimulationCourse[]>([]);
-  const [showResults, setShowResults] = useState(false);
 
   const addCourse = (courseId: string) => {
     const course = availableCourses.find(c => c.id === courseId);
@@ -83,7 +67,7 @@ export default function DecisionSimulator() {
   };
 
   const calculateNewGPA = () => {
-    const currentPoints = currentGPA * completedCredits;
+    const currentPoints = currentGpa * completedCredits;
     const newPoints = selectedCourses.reduce((sum, c) => sum + (c.expectedGrade * c.credits), 0);
     const newCredits = selectedCourses.reduce((sum, c) => sum + c.credits, 0);
     const totalCredits = completedCredits + newCredits;
@@ -91,7 +75,7 @@ export default function DecisionSimulator() {
   };
 
   const newGPA = calculateNewGPA();
-  const gpaChange = newGPA - currentGPA;
+  const gpaChange = newGPA - currentGpa;
   const newCompletedCredits = completedCredits + selectedCourses.reduce((sum, c) => sum + c.credits, 0);
   const remainingCredits = totalRequiredCredits - newCompletedCredits;
   const graduationProgress = (newCompletedCredits / totalRequiredCredits) * 100;
@@ -148,7 +132,7 @@ export default function DecisionSimulator() {
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="p-4 rounded-lg bg-primary/10 text-center">
-                    <p className="text-2xl font-bold text-primary">{currentGPA.toFixed(2)}</p>
+                    <p className="text-2xl font-bold text-primary">{currentGpa.toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">{texts.currentGPA}</p>
                   </div>
                   <div className="p-4 rounded-lg bg-secondary/10 text-center">
@@ -188,7 +172,7 @@ export default function DecisionSimulator() {
                       .filter(c => !selectedCourses.find(sc => sc.id === c.id))
                       .map(course => (
                         <SelectItem key={course.id} value={course.id}>
-                          {isRTL ? course.name : course.nameEn} ({course.credits} {texts.credits})
+                          {isRTL ? (course.name_ar || course.name) : course.name} ({course.credits} {texts.credits})
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -211,7 +195,7 @@ export default function DecisionSimulator() {
                         <div className="flex items-start justify-between mb-3">
                           <div>
                             <h4 className="font-medium">
-                              {isRTL ? course.name : course.nameEn}
+                              {isRTL ? (course.name_ar || course.name) : course.name}
                             </h4>
                             <p className="text-sm text-muted-foreground">
                               {course.credits} {texts.credits}
