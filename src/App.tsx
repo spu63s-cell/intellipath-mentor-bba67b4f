@@ -26,6 +26,7 @@ import AdvisorDashboard from '@/pages/AdvisorDashboard';
 import Admin from '@/pages/Admin';
 import Messages from '@/pages/Messages';
 import Deadlines from '@/pages/Deadlines';
+import About from '@/pages/About';
 import NotFound from '@/pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -65,6 +66,8 @@ function AppContent() {
       <Route path="/deadlines" element={<ProtectedRoute><Deadlines /></ProtectedRoute>} />
       <Route path="/advisor-dashboard" element={<ProtectedRoute allowedRoles={['advisor', 'admin']}><AdvisorDashboard /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><Admin /></ProtectedRoute>} />
+      <Route path="/about" element={<ProtectedRoute><About /></ProtectedRoute>} />
+      <Route path="*" element={<NotFound />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
