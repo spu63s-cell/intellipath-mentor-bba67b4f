@@ -13,13 +13,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useToast } from '@/hooks/use-toast';
+import { useAdvisorStats } from '@/hooks/useAdvisorStats';
 import { 
   AlertTriangle, TrendingDown, TrendingUp, Users, Search, Filter,
   Bell, Mail, MessageSquare, Eye, ChevronDown, ChevronUp,
   GraduationCap, BookOpen, Clock, Target, CheckCircle2, XCircle,
-  BarChart3, PieChart, Activity, Send, UserCheck, AlertCircle
+  BarChart3, PieChart, Activity, Send, UserCheck, AlertCircle, Award
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPie, Pie, Cell } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart as RechartsPie, Pie, Cell, AreaChart, Area } from 'recharts';
 
 type RiskLevel = 'high' | 'medium' | 'low';
 
@@ -193,6 +194,7 @@ const interventions = {
 export default function AdvisorDashboard() {
   const { language } = useLanguageStore();
   const { toast } = useToast();
+  const { stats, isLoading: statsLoading } = useAdvisorStats();
   const isRTL = language === 'ar';
 
   const [students] = useState<Student[]>(mockStudents);
@@ -531,26 +533,60 @@ export default function AdvisorDashboard() {
 
           {/* Analytics Tab */}
           <TabsContent value="analytics" className="space-y-6">
+            {/* Summary Stats */}
+            {stats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/5">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-blue-600">{stats.totalStudents}</p>
+                    <p className="text-sm text-muted-foreground">{isRTL ? 'إجمالي الطلاب' : 'Total Students'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-green-500/10 to-green-600/5">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-green-600">{stats.avgGpa.toFixed(2)}</p>
+                    <p className="text-sm text-muted-foreground">{isRTL ? 'متوسط المعدل' : 'Average GPA'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-yellow-600">{stats.atRiskPercentage.toFixed(1)}%</p>
+                    <p className="text-sm text-muted-foreground">{isRTL ? 'نسبة المعرضين للخطر' : 'At Risk %'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/5">
+                  <CardContent className="p-4 text-center">
+                    <p className="text-3xl font-bold text-purple-600">{stats.excellentStudents}</p>
+                    <p className="text-sm text-muted-foreground">{isRTL ? 'طلاب متفوقون' : 'Excellent Students'}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Risk Distribution */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">{isRTL ? 'توزيع مستويات الخطر' : 'Risk Level Distribution'}</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <PieChart className="h-5 w-5 text-primary" />
+                    {isRTL ? 'توزيع مستويات الخطر' : 'Risk Level Distribution'}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsPie>
                         <Pie
-                          data={pieData}
+                          data={stats?.riskDistribution || pieData}
                           cx="50%"
                           cy="50%"
                           innerRadius={60}
                           outerRadius={80}
                           paddingAngle={5}
-                          dataKey="value"
-                          label={({ name, value }) => `${name}: ${value}`}
+                          dataKey={stats ? 'count' : 'value'}
+                          label={({ name, value, count }) => `${isRTL && stats ? (stats.riskDistribution.find(r => r.count === count)?.labelAr || name) : name}: ${count || value}`}
                         >
-                          {pieData.map((entry, index) => (
+                          {(stats?.riskDistribution || pieData).map((entry, index) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
@@ -561,23 +597,98 @@ export default function AdvisorDashboard() {
                 </CardContent>
               </Card>
 
+              {/* GPA Distribution */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">{isRTL ? 'متوسط المعدل حسب القسم' : 'Average GPA by Department'}</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    {isRTL ? 'توزيع المعدلات' : 'GPA Distribution'}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[250px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={[
-                        { name: 'IT', gpa: 2.4 },
-                        { name: 'Telecom', gpa: 2.6 },
-                        { name: 'Biomedical', gpa: 2.8 },
-                      ]}>
+                      <BarChart data={stats?.gpaDistribution || []}>
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
+                        <XAxis dataKey="range" fontSize={10} />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Department Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-primary" />
+                    {isRTL ? 'إحصائيات الأقسام' : 'Department Statistics'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[250px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats?.departmentStats || []} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" domain={[0, 4]} />
+                        <YAxis type="category" dataKey="department" width={100} fontSize={10} />
+                        <Tooltip />
+                        <Bar dataKey="avgGpa" fill="hsl(var(--secondary))" radius={[0, 4, 4, 0]} name={isRTL ? 'متوسط المعدل' : 'Avg GPA'} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Monthly Trends */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-primary" />
+                    {isRTL ? 'اتجاهات المعدل الشهرية' : 'Monthly GPA Trends'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[250px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={stats?.monthlyTrends || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" fontSize={10} />
                         <YAxis domain={[0, 4]} />
                         <Tooltip />
-                        <Bar dataKey="gpa" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        <Area
+                          type="monotone"
+                          dataKey="avgGpa"
+                          stroke="hsl(var(--primary))"
+                          fill="hsl(var(--primary) / 0.2)"
+                          name={isRTL ? 'متوسط المعدل' : 'Avg GPA'}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Year Level Distribution */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="h-5 w-5 text-primary" />
+                    {isRTL ? 'توزيع الطلاب حسب السنة الدراسية' : 'Students by Year Level'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={stats?.yearDistribution || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey={isRTL ? 'year' : 'yearEn'} />
+                        <YAxis />
+                        <Tooltip />
+                        <Bar dataKey="count" fill="hsl(var(--secondary))" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

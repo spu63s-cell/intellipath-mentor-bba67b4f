@@ -1,16 +1,27 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Mail, Lock, User, GraduationCap, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, GraduationCap, Loader2, Building2 } from 'lucide-react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { Moon, Sun, Languages } from 'lucide-react';
+
+const departments = [
+  { value: 'هندسة المعلوماتية', labelAr: 'هندسة المعلوماتية', labelEn: 'Information Engineering' },
+  { value: 'هندسة الاتصالات', labelAr: 'هندسة الاتصالات', labelEn: 'Telecom Engineering' },
+  { value: 'الهندسة الطبية', labelAr: 'الهندسة الطبية', labelEn: 'Biomedical Engineering' },
+  { value: 'هندسة الميكاترونكس', labelAr: 'هندسة الميكاترونكس', labelEn: 'Mechatronics Engineering' },
+  { value: 'الهندسة المعمارية', labelAr: 'الهندسة المعمارية', labelEn: 'Architecture Engineering' },
+  { value: 'الهندسة المدنية', labelAr: 'الهندسة المدنية', labelEn: 'Civil Engineering' },
+  { value: 'هندسة الطاقة', labelAr: 'هندسة الطاقة', labelEn: 'Energy Engineering' },
+];
 
 const loginSchema = z.object({
   email: z.string().email('البريد الإلكتروني غير صالح'),
@@ -21,6 +32,7 @@ const registerSchema = z.object({
   fullName: z.string().min(2, 'الاسم يجب أن يكون حرفين على الأقل'),
   email: z.string().email('البريد الإلكتروني غير صالح'),
   studentId: z.string().regex(/^[0-9]{7,10}$/, 'الرقم الجامعي يجب أن يكون 7-10 أرقام'),
+  department: z.string().min(1, 'يجب اختيار القسم'),
   password: z.string().min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -44,6 +56,7 @@ export default function Auth() {
     fullName: '',
     email: '',
     studentId: '',
+    department: '',
     password: '',
     confirmPassword: '',
   });
@@ -124,6 +137,7 @@ export default function Auth() {
         data: {
           full_name: registerForm.fullName,
           student_id: registerForm.studentId,
+          department: registerForm.department,
         },
       },
     });
@@ -369,6 +383,29 @@ export default function Auth() {
                     </div>
                     {errors.studentId && (
                       <p className="text-xs text-destructive">{errors.studentId}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="department">{t('القسم', 'Department')}</Label>
+                    <Select
+                      value={registerForm.department}
+                      onValueChange={(value) => setRegisterForm({ ...registerForm, department: value })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <Building2 className="h-4 w-4 text-muted-foreground me-2" />
+                        <SelectValue placeholder={t('اختر القسم', 'Select Department')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((dept) => (
+                          <SelectItem key={dept.value} value={dept.value}>
+                            {language === 'ar' ? dept.labelAr : dept.labelEn}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.department && (
+                      <p className="text-xs text-destructive">{errors.department}</p>
                     )}
                   </div>
 
