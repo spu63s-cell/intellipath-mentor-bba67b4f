@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PanelLeftClose, PanelLeft, Sparkles, Zap, Brain } from 'lucide-react';
+import { PanelLeftClose, PanelLeft, Sparkles, Zap, Brain, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -21,57 +22,50 @@ interface Conversation {
   updated_at: string;
 }
 
-// Animated background particles
+// Animated background with floating orbs
 function ParticleBackground() {
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Gradient overlay */}
+      {/* Gradient mesh background */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
       
-      {/* Floating particles */}
-      {[...Array(20)].map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute w-1 h-1 rounded-full bg-secondary/30"
-          initial={{
-            x: Math.random() * window.innerWidth,
-            y: Math.random() * window.innerHeight,
-          }}
-          animate={{
-            x: Math.random() * window.innerWidth,
-            y: Math.random() * window.innerHeight,
-            scale: [1, 1.5, 1],
-            opacity: [0.3, 0.6, 0.3],
-          }}
-          transition={{
-            duration: Math.random() * 10 + 10,
-            repeat: Infinity,
-            ease: "linear",
-          }}
-        />
-      ))}
-      
-      {/* Glowing orbs */}
+      {/* Floating orbs */}
       <motion.div
-        className="absolute top-20 right-20 w-64 h-64 rounded-full bg-secondary/10 blur-3xl"
+        className="floating-orb absolute top-20 right-20 w-72 h-72 rounded-full bg-gradient-to-br from-secondary/20 to-primary/10 blur-3xl"
         animate={{
           scale: [1, 1.2, 1],
           opacity: [0.3, 0.5, 0.3],
+          x: [0, 30, 0],
+          y: [0, -20, 0],
         }}
         transition={{
-          duration: 8,
+          duration: 10,
           repeat: Infinity,
           ease: "easeInOut",
         }}
       />
       <motion.div
-        className="absolute bottom-20 left-20 w-48 h-48 rounded-full bg-primary/10 blur-3xl"
+        className="floating-orb absolute bottom-20 left-20 w-56 h-56 rounded-full bg-gradient-to-tr from-primary/15 to-secondary/20 blur-3xl"
         animate={{
           scale: [1.2, 1, 1.2],
           opacity: [0.2, 0.4, 0.2],
+          x: [0, -20, 0],
+          y: [0, 30, 0],
         }}
         transition={{
-          duration: 10,
+          duration: 12,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      />
+      <motion.div
+        className="floating-orb absolute top-1/2 left-1/3 w-40 h-40 rounded-full bg-gradient-to-r from-accent/10 to-primary/10 blur-2xl"
+        animate={{
+          scale: [1, 1.3, 1],
+          opacity: [0.15, 0.3, 0.15],
+        }}
+        transition={{
+          duration: 8,
           repeat: Infinity,
           ease: "easeInOut",
         }}
@@ -80,16 +74,18 @@ function ParticleBackground() {
   );
 }
 
-// AI Status indicator
+// AI Status indicator with glow effect
 function AIStatusIndicator({ isThinking }: { isThinking: boolean }) {
+  const { t } = useTranslation();
+  
   return (
     <motion.div
-      className="flex items-center gap-2 text-xs text-muted-foreground"
+      className="flex items-center gap-2 text-xs"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
       <motion.div
-        className={`w-2 h-2 rounded-full ${isThinking ? 'bg-secondary' : 'bg-success'}`}
+        className={`relative w-2.5 h-2.5 rounded-full ${isThinking ? 'bg-secondary' : 'bg-emerald-500'}`}
         animate={isThinking ? {
           scale: [1, 1.3, 1],
           opacity: [1, 0.5, 1],
@@ -98,18 +94,30 @@ function AIStatusIndicator({ isThinking }: { isThinking: boolean }) {
           duration: 1,
           repeat: Infinity,
         }}
-      />
-      <span>{isThinking ? 'يفكر...' : 'متصل'}</span>
+      >
+        {!isThinking && (
+          <motion.div
+            className="absolute inset-0 rounded-full bg-emerald-500"
+            animate={{ scale: [1, 2], opacity: [0.5, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          />
+        )}
+      </motion.div>
+      <span className={isThinking ? 'text-secondary' : 'text-emerald-500'}>
+        {isThinking ? t('chat.thinking') : t('chat.connected')}
+      </span>
     </motion.div>
   );
 }
 
 export default function Chat() {
   const navigate = useNavigate();
-  const { t } = useLanguageStore();
+  const { t } = useTranslation();
+  const { language } = useLanguageStore();
   const { user } = useAuthStore();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const isRTL = language === 'ar';
   
   const [showSidebar, setShowSidebar] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -189,7 +197,6 @@ export default function Chat() {
         .update({ title, updated_at: new Date().toISOString() })
         .eq('id', conversationId);
       
-      // Refresh conversations
       setConversations((prev) =>
         prev.map((c) =>
           c.id === conversationId ? { ...c, title, updated_at: new Date().toISOString() } : c
@@ -214,8 +221,8 @@ export default function Chat() {
       if (error) {
         toast({
           variant: 'destructive',
-          title: t('خطأ', 'Error'),
-          description: t('فشل إنشاء المحادثة', 'Failed to create conversation'),
+          title: t('common.error'),
+          description: t('chat.createError'),
         });
         return;
       }
@@ -254,8 +261,8 @@ export default function Chat() {
     if (error) {
       toast({
         variant: 'destructive',
-        title: t('خطأ', 'Error'),
-        description: t('فشل حذف المحادثة', 'Failed to delete conversation'),
+        title: t('common.error'),
+        description: t('chat.deleteError'),
       });
       return;
     }
@@ -296,18 +303,18 @@ export default function Chat() {
 
         {/* Main Chat Area */}
         <div className="flex flex-1 flex-col z-10">
-          {/* Header */}
+          {/* Header with glassmorphism */}
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex items-center justify-between gap-2 border-b border-border/50 px-4 py-3 glass"
+            className="flex items-center justify-between gap-2 border-b border-border/30 px-4 py-3 glass-morphism"
           >
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setShowSidebar(!showSidebar)}
-                className="hidden h-8 w-8 md:flex hover:bg-secondary/10"
+                className="hidden h-9 w-9 md:flex hover:bg-secondary/10 rounded-xl"
               >
                 {showSidebar ? (
                   <PanelLeftClose className="h-4 w-4" />
@@ -316,14 +323,14 @@ export default function Chat() {
                 )}
               </Button>
               
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <motion.div
-                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-secondary/70 text-secondary-foreground shadow-glow"
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-primary text-white shadow-glow"
                   animate={{
                     boxShadow: [
-                      '0 0 20px hsl(172 66% 40% / 0.3)',
-                      '0 0 30px hsl(172 66% 40% / 0.5)',
-                      '0 0 20px hsl(172 66% 40% / 0.3)',
+                      '0 0 20px hsl(var(--secondary) / 0.3)',
+                      '0 0 35px hsl(var(--secondary) / 0.5)',
+                      '0 0 20px hsl(var(--secondary) / 0.3)',
                     ],
                   }}
                   transition={{ duration: 2, repeat: Infinity }}
@@ -332,7 +339,7 @@ export default function Chat() {
                 </motion.div>
                 <div>
                   <h2 className="font-semibold text-foreground">
-                    {t('المستشار الأكاديمي الذكي', 'AI Academic Advisor')}
+                    {t('chat.title')}
                   </h2>
                   <AIStatusIndicator isThinking={isLoading} />
                 </div>
@@ -341,14 +348,16 @@ export default function Chat() {
             
             <div className="flex items-center gap-2">
               <motion.div
-                className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-full bg-secondary/10 text-secondary text-xs font-medium"
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full glass text-xs font-medium"
                 animate={{
-                  opacity: [0.7, 1, 0.7],
+                  opacity: [0.8, 1, 0.8],
                 }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                <Zap className="h-3 w-3" />
-                <span>Gemini AI</span>
+                <Sparkles className="h-3.5 w-3.5 text-secondary" />
+                <span className="bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent font-semibold">
+                  Gemini AI
+                </span>
               </motion.div>
             </div>
           </motion.div>
@@ -359,7 +368,7 @@ export default function Chat() {
               {messages.length === 0 ? (
                 <SuggestedQuestions onSelect={handleSend} />
               ) : (
-                <div className="mx-auto max-w-3xl py-4 px-2">
+                <div className="mx-auto max-w-3xl py-6 px-4">
                   <AnimatePresence mode="popLayout">
                     {messages.map((msg, i) => (
                       <motion.div
@@ -391,8 +400,10 @@ export default function Chat() {
             </div>
           </ScrollArea>
 
-          {/* Input */}
-          <ChatInput onSend={handleSend} isLoading={isLoading} />
+          {/* Input with glassmorphism */}
+          <div className="glass-morphism border-t border-border/30">
+            <ChatInput onSend={handleSend} isLoading={isLoading} />
+          </div>
         </div>
       </div>
     </MainLayout>

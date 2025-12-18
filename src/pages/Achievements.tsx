@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { 
   Trophy, 
   Medal, 
@@ -19,7 +20,7 @@ import {
   Calendar,
   Loader2
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardGlass, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -45,17 +46,17 @@ const iconMap: Record<string, any> = {
   medal: Medal,
 };
 
-const colorMap: Record<string, { text: string; bg: string }> = {
-  primary: { text: 'text-primary', bg: 'bg-primary/10' },
-  yellow: { text: 'text-yellow-500', bg: 'bg-yellow-500/10' },
-  blue: { text: 'text-blue-500', bg: 'bg-blue-500/10' },
-  orange: { text: 'text-orange-500', bg: 'bg-orange-500/10' },
-  purple: { text: 'text-purple-500', bg: 'bg-purple-500/10' },
-  green: { text: 'text-green-500', bg: 'bg-green-500/10' },
-  cyan: { text: 'text-cyan-500', bg: 'bg-cyan-500/10' },
-  amber: { text: 'text-amber-500', bg: 'bg-amber-500/10' },
-  pink: { text: 'text-pink-500', bg: 'bg-pink-500/10' },
-  red: { text: 'text-red-500', bg: 'bg-red-500/10' },
+const colorMap: Record<string, { text: string; bg: string; gradient: string }> = {
+  primary: { text: 'text-primary', bg: 'bg-primary/10', gradient: 'from-primary to-primary/70' },
+  yellow: { text: 'text-amber-500', bg: 'bg-amber-500/10', gradient: 'from-amber-500 to-yellow-500' },
+  blue: { text: 'text-blue-500', bg: 'bg-blue-500/10', gradient: 'from-blue-500 to-cyan-500' },
+  orange: { text: 'text-orange-500', bg: 'bg-orange-500/10', gradient: 'from-orange-500 to-red-500' },
+  purple: { text: 'text-purple-500', bg: 'bg-purple-500/10', gradient: 'from-purple-500 to-pink-500' },
+  green: { text: 'text-emerald-500', bg: 'bg-emerald-500/10', gradient: 'from-emerald-500 to-green-500' },
+  cyan: { text: 'text-cyan-500', bg: 'bg-cyan-500/10', gradient: 'from-cyan-500 to-teal-500' },
+  amber: { text: 'text-amber-500', bg: 'bg-amber-500/10', gradient: 'from-amber-500 to-orange-500' },
+  pink: { text: 'text-pink-500', bg: 'bg-pink-500/10', gradient: 'from-pink-500 to-rose-500' },
+  red: { text: 'text-red-500', bg: 'bg-red-500/10', gradient: 'from-red-500 to-rose-500' },
 };
 
 // Mock leaderboard data
@@ -75,7 +76,8 @@ const weeklyChalllenges = [
 ];
 
 export default function Achievements() {
-  const { t, language } = useLanguageStore();
+  const { t } = useTranslation();
+  const { language } = useLanguageStore();
   const [activeTab, setActiveTab] = useState('achievements');
   const { achievements, studentData, unlockedCount, isLoading } = useAchievements();
 
@@ -93,78 +95,97 @@ export default function Achievements() {
   return (
     <MainLayout>
       <div className="container mx-auto space-y-6 p-4 md:p-6">
-        {/* Header Stats */}
+        {/* Header Stats with enhanced gradient */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Card className="overflow-hidden border-0 gradient-secondary text-secondary-foreground">
-            <CardContent className="p-6">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <CardGlass className="overflow-hidden border-0 bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 text-white shadow-xl shadow-purple-500/20">
+            <CardContent className="p-6 relative">
+              {/* Background decoration */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-white/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-purple-500/20 to-transparent rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative z-10">
                 <div className="flex items-center gap-4">
                   <div className="relative">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-full bg-white/20 text-3xl font-bold">
+                    <motion.div 
+                      className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 backdrop-blur-sm text-3xl font-bold border border-white/30"
+                      animate={{ scale: [1, 1.05, 1] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
                       {userStats.level}
-                    </div>
-                    <div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white">
+                    </motion.div>
+                    <motion.div 
+                      className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-500 text-white shadow-lg"
+                      animate={{ rotate: [0, 10, -10, 0] }}
+                      transition={{ duration: 2, repeat: Infinity }}
+                    >
                       <Flame className="h-4 w-4" />
-                    </div>
+                    </motion.div>
                   </div>
                   <div>
                     <h2 className="text-2xl font-bold">
-                      {t('المستوى', 'Level')} {userStats.level}
+                      {t('achievements.level', { level: userStats.level })}
                     </h2>
-                    <p className="text-secondary-foreground/80">
+                    <p className="text-white/80">
                       {userStats.xp} / {userStats.nextLevelXp} XP
                     </p>
-                    <Progress value={xpProgress} className="mt-2 h-2 w-40 bg-white/20" />
+                    <div className="mt-2 relative h-2 w-40 rounded-full bg-white/20 overflow-hidden">
+                      <motion.div
+                        className="absolute inset-y-0 left-0 bg-gradient-to-r from-white to-white/80 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${xpProgress}%` }}
+                        transition={{ duration: 1 }}
+                      />
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex flex-col items-end gap-4">
                   <Button 
                     variant="secondary" 
-                    className="gap-2 bg-white/20 hover:bg-white/30 text-secondary-foreground"
+                    className="gap-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm"
                     onClick={() => celebrateAchievement()}
                   >
                     <Sparkles className="h-4 w-4" />
-                    {t('احتفل!', 'Celebrate!')}
+                    {t('achievements.celebrate')}
                   </Button>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div className="rounded-xl bg-white/10 p-3">
+                  <div className="grid grid-cols-3 gap-3 text-center">
+                    <div className="rounded-xl bg-white/10 backdrop-blur-sm p-3 border border-white/20">
                       <p className="text-2xl font-bold">{userStats.rank}</p>
-                      <p className="text-xs text-secondary-foreground/80">{t('الترتيب', 'Rank')}</p>
+                      <p className="text-xs text-white/80">{t('achievements.rank')}</p>
                     </div>
-                    <div className="rounded-xl bg-white/10 p-3">
+                    <div className="rounded-xl bg-white/10 backdrop-blur-sm p-3 border border-white/20">
                       <p className="text-2xl font-bold">{userStats.streak}</p>
-                      <p className="text-xs text-secondary-foreground/80">{t('سلسلة', 'Streak')}</p>
+                      <p className="text-xs text-white/80">{t('achievements.streak')}</p>
                     </div>
-                    <div className="rounded-xl bg-white/10 p-3">
+                    <div className="rounded-xl bg-white/10 backdrop-blur-sm p-3 border border-white/20">
                       <p className="text-2xl font-bold">{userStats.totalAchievements}</p>
-                      <p className="text-xs text-secondary-foreground/80">{t('إنجازات', 'Badges')}</p>
+                      <p className="text-xs text-white/80">{t('achievements.badges')}</p>
                     </div>
                   </div>
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </CardGlass>
         </motion.div>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="achievements" className="flex items-center gap-2">
+          <TabsList className="glass grid w-full grid-cols-3 p-1">
+            <TabsTrigger value="achievements" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-white">
               <Trophy className="h-4 w-4" />
-              {t('الإنجازات', 'Achievements')}
+              {t('achievements.title')}
             </TabsTrigger>
-            <TabsTrigger value="leaderboard" className="flex items-center gap-2">
+            <TabsTrigger value="leaderboard" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-white">
               <Medal className="h-4 w-4" />
-              {t('لوحة المتصدرين', 'Leaderboard')}
+              {t('achievements.leaderboard')}
             </TabsTrigger>
-            <TabsTrigger value="challenges" className="flex items-center gap-2">
+            <TabsTrigger value="challenges" className="flex items-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-white">
               <Target className="h-4 w-4" />
-              {t('التحديات', 'Challenges')}
+              {t('achievements.challenges')}
             </TabsTrigger>
           </TabsList>
 
@@ -186,40 +207,52 @@ export default function Achievements() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
+                      whileHover={{ y: -5, scale: 1.02 }}
                     >
-                      <Card
+                      <CardGlass
                         className={cn(
-                          'relative overflow-hidden transition-all hover-lift',
+                          'relative overflow-hidden transition-all hover:shadow-xl group',
                           !achievement.unlocked && 'opacity-60'
                         )}
                       >
                         {!achievement.unlocked && (
-                          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm">
-                            <Lock className="h-8 w-8 text-muted-foreground" />
+                          <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-sm z-10">
+                            <div className="p-3 rounded-full bg-muted">
+                              <Lock className="h-6 w-6 text-muted-foreground" />
+                            </div>
                           </div>
                         )}
                         <CardContent className="p-4">
                           <div className="flex items-start gap-3">
-                            <div className={cn('rounded-xl p-3', colors.bg)}>
-                              <IconComponent className={cn('h-6 w-6', colors.text)} />
-                            </div>
+                            <motion.div 
+                              className={cn('rounded-xl p-3 bg-gradient-to-br', colors.gradient, 'text-white shadow-lg')}
+                              whileHover={{ scale: 1.1, rotate: [0, -5, 5, 0] }}
+                            >
+                              <IconComponent className="h-6 w-6" />
+                            </motion.div>
                             <div className="flex-1">
                               <h3 className="font-semibold text-foreground">
                                 {language === 'ar' ? (achievement.name_ar || achievement.name) : achievement.name}
                               </h3>
-                              <p className="mt-1 text-xs text-muted-foreground">
+                              <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
                                 {language === 'ar' ? (achievement.description_ar || achievement.description) : achievement.description}
                               </p>
-                              <Badge variant="secondary" className="mt-2 text-xs">
+                              <Badge variant="secondary" className="mt-2 text-xs glass">
                                 +{achievement.xp_reward || 0} XP
                               </Badge>
                             </div>
                           </div>
                           {achievement.unlocked && (
-                            <CheckCircle2 className="absolute top-2 left-2 h-5 w-5 text-green-500 rtl:left-auto rtl:right-2" />
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="absolute top-2 left-2 rtl:left-auto rtl:right-2"
+                            >
+                              <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                            </motion.div>
                           )}
                         </CardContent>
-                      </Card>
+                      </CardGlass>
                     </motion.div>
                   );
                 })}
@@ -229,11 +262,11 @@ export default function Achievements() {
 
           {/* Leaderboard Tab */}
           <TabsContent value="leaderboard" className="mt-6">
-            <Card>
+            <CardGlass>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Medal className="h-5 w-5 text-yellow-500" />
-                  {t('أفضل الطلاب هذا الأسبوع', 'Top Students This Week')}
+                  <Medal className="h-5 w-5 text-amber-500" />
+                  {t('achievements.topStudents')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -245,48 +278,52 @@ export default function Achievements() {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ duration: 0.3, delay: index * 0.05 }}
                       className={cn(
-                        'flex items-center gap-4 rounded-xl p-3 transition-colors',
-                        student.rank <= 3 ? 'bg-gradient-to-l from-yellow-500/10 to-transparent' : 'bg-muted/50'
+                        'flex items-center gap-4 rounded-xl p-4 transition-all',
+                        student.rank <= 3 
+                          ? 'bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-transparent border border-amber-500/20' 
+                          : 'glass'
                       )}
                     >
                       <div
                         className={cn(
-                          'flex h-10 w-10 items-center justify-center rounded-full font-bold',
-                          student.rank === 1 && 'bg-yellow-500 text-white',
-                          student.rank === 2 && 'bg-gray-400 text-white',
-                          student.rank === 3 && 'bg-amber-600 text-white',
+                          'flex h-12 w-12 items-center justify-center rounded-xl font-bold shadow-lg',
+                          student.rank === 1 && 'bg-gradient-to-br from-amber-400 to-yellow-600 text-white',
+                          student.rank === 2 && 'bg-gradient-to-br from-slate-400 to-gray-500 text-white',
+                          student.rank === 3 && 'bg-gradient-to-br from-amber-600 to-orange-700 text-white',
                           student.rank > 3 && 'bg-muted text-muted-foreground'
                         )}
                       >
                         {student.rank <= 3 ? (
-                          <Crown className="h-5 w-5" />
+                          <Crown className="h-6 w-6" />
                         ) : (
                           student.rank
                         )}
                       </div>
-                      <Avatar className="h-10 w-10">
+                      <Avatar className="h-12 w-12 border-2 border-border">
                         <AvatarImage src={student.avatar} />
-                        <AvatarFallback className="bg-primary/10">
+                        <AvatarFallback className="bg-gradient-to-br from-primary/20 to-secondary/20">
                           {(language === 'ar' ? student.name : student.nameEn).charAt(0)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1">
-                        <p className="font-medium text-foreground">
+                        <p className="font-semibold text-foreground">
                           {language === 'ar' ? student.name : student.nameEn}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {t('المستوى', 'Level')} {student.level}
+                          {t('achievements.level', { level: student.level })}
                         </p>
                       </div>
-                      <div className="text-left rtl:text-right">
-                        <p className="font-bold text-primary">{student.xp.toLocaleString()}</p>
+                      <div className="text-end">
+                        <p className="font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                          {student.xp.toLocaleString()}
+                        </p>
                         <p className="text-xs text-muted-foreground">XP</p>
                       </div>
                     </motion.div>
                   ))}
                 </div>
               </CardContent>
-            </Card>
+            </CardGlass>
           </TabsContent>
 
           {/* Challenges Tab */}
@@ -298,72 +335,97 @@ export default function Achievements() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: index * 0.1 }}
+                  whileHover={{ y: -3 }}
                 >
-                  <Card className={cn(challenge.completed && 'border-green-500/50 bg-green-500/5')}>
+                  <CardGlass className={cn(
+                    'transition-all',
+                    challenge.completed && 'border-emerald-500/30 bg-gradient-to-br from-emerald-500/5 to-green-500/5'
+                  )}>
                     <CardContent className="p-4">
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-3">
                           <div className={cn(
-                            'rounded-xl p-3',
-                            challenge.completed ? 'bg-green-500/10' : 'bg-primary/10'
+                            'rounded-xl p-3 shadow-lg',
+                            challenge.completed 
+                              ? 'bg-gradient-to-br from-emerald-500 to-green-600' 
+                              : 'bg-gradient-to-br from-primary to-secondary'
                           )}>
-                            <challenge.icon className={cn(
-                              'h-5 w-5',
-                              challenge.completed ? 'text-green-500' : 'text-primary'
-                            )} />
+                            <challenge.icon className="h-5 w-5 text-white" />
                           </div>
                           <div>
                             <h3 className="font-semibold text-foreground">
                               {language === 'ar' ? challenge.title : challenge.titleEn}
                             </h3>
-                            <Badge variant="secondary" className="mt-1 text-xs">
+                            <Badge variant="secondary" className="mt-1 text-xs glass">
                               +{challenge.xp} XP
                             </Badge>
                           </div>
                         </div>
                         {challenge.completed && (
-                          <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                          >
+                            <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+                          </motion.div>
                         )}
                       </div>
                       <div className="mt-4">
-                        <div className="mb-1 flex justify-between text-xs">
+                        <div className="mb-2 flex justify-between text-xs">
                           <span className="text-muted-foreground">
-                            {t('التقدم', 'Progress')}
+                            {t('achievements.progressLabel')}
                           </span>
-                          <span className="font-medium">
+                          <span className="font-semibold">
                             {challenge.progress}/{challenge.total}
                           </span>
                         </div>
-                        <Progress
-                          value={(challenge.progress / challenge.total) * 100}
-                          className="h-2"
-                        />
+                        <div className="relative h-2 rounded-full bg-muted overflow-hidden">
+                          <motion.div
+                            className={cn(
+                              'absolute inset-y-0 left-0 rounded-full',
+                              challenge.completed
+                                ? 'bg-gradient-to-r from-emerald-500 to-green-500'
+                                : 'bg-gradient-to-r from-primary to-secondary'
+                            )}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${(challenge.progress / challenge.total) * 100}%` }}
+                            transition={{ duration: 0.5 }}
+                          />
+                        </div>
                       </div>
                     </CardContent>
-                  </Card>
+                  </CardGlass>
                 </motion.div>
               ))}
             </div>
 
             {/* Weekly Reset Timer */}
-            <Card className="mt-6">
-              <CardContent className="flex items-center justify-between p-4">
-                <div className="flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="font-medium text-foreground">
-                      {t('التحديات الأسبوعية تتجدد في', 'Weekly challenges reset in')}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {t('3 أيام و 14 ساعة', '3 days and 14 hours')}
-                    </p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <CardGlass className="mt-6">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20">
+                      <Clock className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {t('achievements.resetIn')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {t('achievements.resetTime')}
+                      </p>
+                    </div>
                   </div>
-                </div>
-                <Badge variant="outline">
-                  {t('2/3 مكتمل', '2/3 Complete')}
-                </Badge>
-              </CardContent>
-            </Card>
+                  <Badge variant="outline" className="glass">
+                    {t('achievements.completedCount')}
+                  </Badge>
+                </CardContent>
+              </CardGlass>
+            </motion.div>
           </TabsContent>
         </Tabs>
       </div>

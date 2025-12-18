@@ -1,4 +1,57 @@
 {
+  "chat": {
+    "title": "AI Academic Advisor",
+    "thinking": "Thinking...",
+    "connected": "Connected",
+    "createError": "Failed to create conversation",
+    "deleteError": "Failed to delete conversation"
+  },
+  "career": {
+    "title": "Career Planner",
+    "subtitle": "Plan your career path",
+    "paths": "Career Paths",
+    "roadmap": "Roadmap",
+    "skills": "Skills",
+    "salary": "Expected Salary",
+    "demand": "Market Demand",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "progress": "Progress",
+    "requiredCourses": "Required Courses",
+    "requiredSkills": "Required Skills",
+    "yourMilestones": "Your Milestones",
+    "startPath": "Start This Path",
+    "trackProgress": "Track your progress towards career goals"
+  },
+  "achievements": {
+    "title": "Achievements",
+    "level": "Level {{level}}",
+    "celebrate": "Celebrate!",
+    "rank": "Rank",
+    "streak": "Streak",
+    "badges": "Badges",
+    "leaderboard": "Leaderboard",
+    "challenges": "Challenges",
+    "topStudents": "Top Students This Week",
+    "progressLabel": "Progress",
+    "resetIn": "Weekly challenges reset in",
+    "resetTime": "3 days and 14 hours",
+    "completedCount": "2/3 Complete"
+  },
+  "learningStyle": {
+    "title": "Learning Style Analysis",
+    "subtitle": "Discover your optimal learning style",
+    "question": "Question",
+    "of": "of",
+    "yourResults": "Your Results",
+    "dominantStyle": "Your Dominant Style",
+    "tips": "Study Tips",
+    "retake": "Retake Quiz",
+    "share": "Share Results",
+    "download": "Download Report",
+    "previousQuestion": "Previous Question"
+  },
   "common": {
     "loading": "Loading...",
     "error": "An error occurred",

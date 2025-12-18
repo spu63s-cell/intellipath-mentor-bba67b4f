@@ -271,7 +271,10 @@
     "newChat": "محادثة جديدة",
     "placeholder": "اكتب سؤالك هنا...",
     "send": "إرسال",
-    "thinking": "جاري التفكير...",
+    "thinking": "يفكر...",
+    "connected": "متصل",
+    "createError": "فشل إنشاء المحادثة",
+    "deleteError": "فشل حذف المحادثة",
     "suggestedQuestions": {
       "title": "أسئلة مقترحة",
       "items": [
