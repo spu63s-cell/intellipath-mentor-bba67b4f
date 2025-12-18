@@ -1,5 +1,6 @@
-import { motion } from 'framer-motion';
+import { motion, useScroll, useTransform } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useLanguageStore } from '@/stores/languageStore';
@@ -7,8 +8,10 @@ import { useThemeStore } from '@/stores/themeStore';
 import { 
   Brain, BookOpen, Target, Trophy, MessageSquare, Network,
   Lightbulb, Shield, BarChart3, Briefcase, Sun, Moon, Globe,
-  Star, Users, GraduationCap, CheckCircle2, ArrowRight, ArrowLeft
+  Star, Users, GraduationCap, CheckCircle2, ArrowRight, ArrowLeft,
+  Sparkles, Zap
 } from 'lucide-react';
+import { ParticlesBackground, FloatingOrbs, GridPattern } from '@/components/ui/particles-background';
 
 const features = [
   { icon: Shield, titleAr: 'أمان عالي', titleEn: 'High Security', descAr: 'تشفير قوي وحماية البيانات', descEn: 'Strong encryption and data protection', color: 'from-blue-500 to-blue-600' },
@@ -48,20 +51,38 @@ export default function Index() {
   const { theme, toggleTheme } = useThemeStore();
   const isRTL = language === 'ar';
   const ArrowIcon = isRTL ? ArrowLeft : ArrowRight;
+  
+  // Parallax refs
+  const heroRef = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"]
+  });
+  
+  const heroY = useTransform(scrollYProgress, [0, 1], [0, 200]);
+  const heroOpacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       {/* Navbar */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/60 backdrop-blur-xl border-b border-border/50">
         <div className="container mx-auto flex items-center justify-between px-4 py-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 shadow-lg">
+          <motion.div 
+            className="flex items-center gap-2"
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/20">
               <GraduationCap className="h-6 w-6 text-white" />
             </div>
             <span className="text-xl font-bold">IntelliPath</span>
-          </div>
+          </motion.div>
           
-          <div className="flex items-center gap-2">
+          <motion.div 
+            className="flex items-center gap-2"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+          >
             <Button
               variant="ghost"
               size="icon"
@@ -81,112 +102,152 @@ export default function Index() {
             <Button 
               variant="ghost" 
               onClick={() => navigate('/auth')}
-              className="hover:bg-muted"
+              className="hover:bg-muted hidden sm:flex"
             >
               {t('تسجيل الدخول', 'Login')}
             </Button>
             <Button 
               onClick={() => navigate('/auth')} 
-              className="bg-gradient-to-r from-teal-500 to-teal-600 text-white hover:from-teal-600 hover:to-teal-700 shadow-md"
+              className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20"
             >
               {t('ابدأ الآن', 'Get Started')}
             </Button>
-          </div>
+          </motion.div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
-        {/* Background Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-secondary/10" />
+      {/* Hero Section with Parallax */}
+      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden pt-16">
+        {/* Animated Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950" />
+        <FloatingOrbs />
+        <ParticlesBackground particleCount={80} />
+        <GridPattern />
         
-        {/* Animated Orbs */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div
-            className="absolute top-1/4 right-1/4 w-96 h-96 rounded-full bg-gradient-to-br from-teal-500/20 to-cyan-500/10 blur-3xl"
-            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-            transition={{ duration: 8, repeat: Infinity }}
-          />
-          <motion.div
-            className="absolute bottom-1/4 left-1/4 w-80 h-80 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/10 blur-3xl"
-            animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.5, 0.3] }}
-            transition={{ duration: 10, repeat: Infinity }}
-          />
-        </div>
-
-        <div className="container relative z-10 mx-auto px-4 text-center">
+        {/* Parallax Content */}
+        <motion.div 
+          style={{ y: heroY, opacity: heroOpacity }}
+          className="container relative z-10 mx-auto px-4 text-center"
+        >
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <h1 className="mb-4 text-4xl font-bold leading-tight md:text-5xl lg:text-6xl">
+            {/* Badge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="inline-flex items-center gap-2 mb-6 px-4 py-2 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm"
+            >
+              <Sparkles className="h-4 w-4 text-teal-400" />
+              <span className="text-sm text-white/80">{t('مدعوم بالذكاء الاصطناعي', 'Powered by AI')}</span>
+            </motion.div>
+            
+            <h1 className="mb-4 text-4xl font-bold leading-tight md:text-5xl lg:text-7xl text-white">
               {t('مرحباً بك في', 'Welcome to')}
               {' '}
-              <span className="bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 bg-clip-text text-transparent">
-                IntelliPath
+              <span className="relative">
+                <span className="bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                  IntelliPath
+                </span>
+                <motion.span
+                  className="absolute -bottom-2 left-0 right-0 h-1 bg-gradient-to-r from-teal-400 via-cyan-400 to-blue-400 rounded-full"
+                  initial={{ scaleX: 0 }}
+                  animate={{ scaleX: 1 }}
+                  transition={{ delay: 0.5, duration: 0.8 }}
+                />
               </span>
             </h1>
             
-            <p className="mx-auto mb-8 max-w-2xl text-base text-muted-foreground md:text-lg">
+            <p className="mx-auto mb-8 max-w-2xl text-base text-white/60 md:text-lg lg:text-xl">
               {t(
                 'مستشارك الأكاديمي الذكي - نظام متكامل لطلاب كلية الهندسة في الجامعة السورية الخاصة',
                 'Your Intelligent Academic Advisor - Integrated system for Engineering students at Syrian Private University'
               )}
             </p>
 
-            <div className="flex flex-wrap justify-center gap-4 mb-12">
+            <motion.div 
+              className="flex flex-wrap justify-center gap-4 mb-12"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
               <Button 
                 size="lg" 
                 onClick={() => navigate('/auth')}
-                className="bg-gradient-to-r from-teal-500 to-teal-600 text-white hover:from-teal-600 hover:to-teal-700 shadow-lg gap-2"
+                className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/30 gap-2 text-base px-8 group"
               >
                 {t('ابدأ رحلتك', 'Start Your Journey')}
-                <ArrowIcon className="h-5 w-5" />
+                <ArrowIcon className="h-5 w-5 transition-transform group-hover:translate-x-1 rtl:group-hover:-translate-x-1" />
               </Button>
               <Button 
                 size="lg" 
                 variant="outline"
                 onClick={() => navigate('/auth')}
-                className="border-2"
+                className="border-2 border-white/20 text-white hover:bg-white/10 backdrop-blur-sm"
               >
+                <Zap className="h-5 w-5 me-2" />
                 {t('تعرف على النظام', 'Learn More')}
               </Button>
-            </div>
+            </motion.div>
           </motion.div>
 
           {/* Feature Cards */}
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2 }}
+            transition={{ duration: 0.8, delay: 0.3 }}
             className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8 max-w-4xl mx-auto"
           >
             {features.map((feature, i) => (
-              <Card 
-                key={i} 
-                className="bg-card/80 backdrop-blur-xl border border-border hover:border-primary/30 transition-all duration-300 group hover:shadow-lg"
+              <motion.div
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + i * 0.1 }}
+                whileHover={{ y: -5, scale: 1.02 }}
               >
-                <CardContent className="p-6">
-                  <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform shadow-md`}>
-                    <feature.icon className="h-6 w-6 text-white" />
-                  </div>
-                  <h3 className="font-bold mb-2">
-                    {isRTL ? feature.titleAr : feature.titleEn}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {isRTL ? feature.descAr : feature.descEn}
-                  </p>
-                </CardContent>
-              </Card>
+                <Card className="bg-white/5 backdrop-blur-xl border border-white/10 hover:border-teal-500/30 transition-all duration-300 group hover:shadow-lg hover:shadow-teal-500/10">
+                  <CardContent className="p-6">
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${feature.color} flex items-center justify-center mb-4 mx-auto group-hover:scale-110 transition-transform shadow-lg`}>
+                      <feature.icon className="h-6 w-6 text-white" />
+                    </div>
+                    <h3 className="font-bold mb-2 text-white">
+                      {isRTL ? feature.titleAr : feature.titleEn}
+                    </h3>
+                    <p className="text-sm text-white/60">
+                      {isRTL ? feature.descAr : feature.descEn}
+                    </p>
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
           </motion.div>
-        </div>
+        </motion.div>
+        
+        {/* Scroll Indicator */}
+        <motion.div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2"
+          animate={{ y: [0, 10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <div className="w-6 h-10 rounded-full border-2 border-white/30 flex items-start justify-center p-2">
+            <motion.div
+              className="w-1.5 h-1.5 rounded-full bg-teal-400"
+              animate={{ y: [0, 16, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+          </div>
+        </motion.div>
       </section>
 
       {/* How It Works Section */}
-      <section className="py-20 bg-muted/30 relative">
-        <div className="container mx-auto px-4">
+      <section className="py-20 bg-muted/30 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-background via-transparent to-background pointer-events-none" />
+        
+        <div className="container mx-auto px-4 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -209,11 +270,20 @@ export default function Index() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
-                className="text-center"
+                whileHover={{ y: -5 }}
+                className="text-center relative"
               >
-                <div className={`w-16 h-16 bg-gradient-to-br ${step.color} rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg`}>
+                {/* Connector line */}
+                {i < steps.length - 1 && (
+                  <div className="hidden md:block absolute top-8 left-1/2 w-full h-0.5 bg-gradient-to-r from-border to-transparent" />
+                )}
+                
+                <motion.div 
+                  className={`w-16 h-16 bg-gradient-to-br ${step.color} rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg relative z-10`}
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                >
                   <span className="text-2xl font-bold text-white">{step.num}</span>
-                </div>
+                </motion.div>
                 <h3 className="font-bold mb-2">
                   {isRTL ? step.titleAr : step.titleEn}
                 </h3>
@@ -227,7 +297,7 @@ export default function Index() {
       </section>
 
       {/* All Features Section */}
-      <section className="py-20 bg-background relative">
+      <section className="py-20 bg-background relative overflow-hidden">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -235,6 +305,16 @@ export default function Index() {
             viewport={{ once: true }}
             className="text-center mb-12"
           >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              className="inline-flex items-center gap-2 mb-4 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20"
+            >
+              <Sparkles className="h-4 w-4 text-teal-500" />
+              <span className="text-sm text-teal-600 dark:text-teal-400">{t('ميزات متقدمة', 'Advanced Features')}</span>
+            </motion.div>
+            
             <h2 className="text-3xl font-bold mb-4">
               {t('10 أنظمة ذكية متكاملة', '10 Integrated AI Systems')}
             </h2>
@@ -254,12 +334,16 @@ export default function Index() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.05 }}
+                whileHover={{ y: -5, scale: 1.02 }}
               >
-                <Card className="h-full bg-card hover:bg-accent/50 border border-border hover:border-primary/30 transition-all duration-300 cursor-pointer group hover:shadow-md">
+                <Card className="h-full bg-card hover:bg-accent/50 border border-border hover:border-teal-500/30 transition-all duration-300 cursor-pointer group hover:shadow-lg hover:shadow-teal-500/5">
                   <CardContent className="p-4 text-center">
-                    <div className="mb-3 mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center group-hover:from-teal-500/30 group-hover:to-cyan-500/30 transition-colors">
+                    <motion.div 
+                      className="mb-3 mx-auto w-12 h-12 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 flex items-center justify-center group-hover:from-teal-500/30 group-hover:to-cyan-500/30 transition-colors"
+                      whileHover={{ rotate: 10 }}
+                    >
                       <feature.icon className="h-6 w-6 text-teal-600 dark:text-teal-400" />
-                    </div>
+                    </motion.div>
                     <h3 className="font-semibold mb-1 text-sm">
                       {isRTL ? feature.titleAr : feature.titleEn}
                     </h3>
@@ -275,7 +359,7 @@ export default function Index() {
       </section>
 
       {/* Testimonials */}
-      <section className="py-20 bg-muted/30">
+      <section className="py-20 bg-muted/30 relative overflow-hidden">
         <div className="container mx-auto px-4">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -296,8 +380,9 @@ export default function Index() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.1 }}
+                whileHover={{ y: -5 }}
               >
-                <Card className="h-full bg-card border border-border hover:shadow-lg transition-shadow">
+                <Card className="h-full bg-card border border-border hover:border-teal-500/30 hover:shadow-lg transition-all duration-300">
                   <CardContent className="p-6">
                     <div className="flex gap-1 mb-4">
                       {[...Array(5)].map((_, j) => (
@@ -308,7 +393,7 @@ export default function Index() {
                       "{isRTL ? testimonial.text : testimonial.textEn}"
                     </p>
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center">
                         <Users className="h-5 w-5 text-white" />
                       </div>
                       <div>
@@ -329,57 +414,56 @@ export default function Index() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-br from-primary/10 via-background to-secondary/10 relative overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-gradient-to-br from-teal-500/10 to-cyan-500/5 blur-3xl"
-            animate={{ scale: [1, 1.1, 1], rotate: [0, 180, 360] }}
-            transition={{ duration: 20, repeat: Infinity }}
-          />
-        </div>
+      <section className="py-20 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
+        <FloatingOrbs />
+        <ParticlesBackground particleCount={40} />
         
-        <div className="container relative z-10 mx-auto px-4 text-center">
+        <div className="container mx-auto px-4 relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            className="text-center"
           >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              {t('ابدأ رحلتك الأكاديمية اليوم', 'Start Your Academic Journey Today')}
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+              {t('هل أنت جاهز للبدء؟', 'Ready to Get Started?')}
             </h2>
-            <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
+            <p className="text-white/60 mb-8 max-w-xl mx-auto">
               {t(
                 'انضم إلى آلاف الطلاب الذين يستخدمون IntelliPath لتحقيق أهدافهم الأكاديمية',
                 'Join thousands of students using IntelliPath to achieve their academic goals'
               )}
             </p>
-            <Button
-              size="lg"
-              onClick={() => navigate('/auth')}
-              className="bg-gradient-to-r from-teal-500 to-teal-600 text-white hover:from-teal-600 hover:to-teal-700 shadow-lg gap-2"
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
-              {t('سجل الآن مجاناً', 'Register Now for Free')}
-              <ArrowIcon className="h-5 w-5" />
-            </Button>
+              <Button 
+                size="lg" 
+                onClick={() => navigate('/auth')}
+                className="bg-gradient-to-r from-teal-500 to-cyan-500 text-white hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/30 gap-2 text-base px-8"
+              >
+                {t('ابدأ مجاناً', 'Start Free')}
+                <ArrowIcon className="h-5 w-5" />
+              </Button>
+            </motion.div>
           </motion.div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="py-8 bg-card border-t border-border">
+      <footer className="py-8 bg-background border-t border-border">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-teal-600">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal-500 to-cyan-500">
                 <GraduationCap className="h-4 w-4 text-white" />
               </div>
               <span className="font-bold">IntelliPath</span>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {t(
-                `© ${new Date().getFullYear()} IntelliPath - الجامعة السورية الخاصة. جميع الحقوق محفوظة.`,
-                `© ${new Date().getFullYear()} IntelliPath - Syrian Private University. All rights reserved.`
-              )}
+            <p className="text-sm text-muted-foreground text-center">
+              © {new Date().getFullYear()} IntelliPath. {t('جميع الحقوق محفوظة', 'All rights reserved')}
             </p>
           </div>
         </div>
