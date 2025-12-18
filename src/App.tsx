@@ -7,6 +7,7 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { useLanguageStore } from '@/stores/languageStore';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 
 // Pages
 import Index from '@/pages/Index';
@@ -31,6 +32,7 @@ const queryClient = new QueryClient();
 
 function AppContent() {
   const { language } = useLanguageStore();
+  useKeyboardShortcuts(); // Enable keyboard shortcuts
 
   useEffect(() => {
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';

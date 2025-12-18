@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Trophy, 
@@ -13,16 +13,19 @@ import {
   Zap,
   Gift,
   Lock,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
 import { cn } from '@/lib/utils';
+import { celebrateAchievement, celebrateLevelUp, celebrateStars } from '@/utils/confetti';
 
 // Mock achievements data
 const achievements = [
@@ -105,18 +108,28 @@ export default function Achievements() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="rounded-xl bg-white/10 p-3">
-                    <p className="text-2xl font-bold">{userStats.rank}</p>
-                    <p className="text-xs text-secondary-foreground/80">{t('الترتيب', 'Rank')}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/10 p-3">
-                    <p className="text-2xl font-bold">{userStats.streak}</p>
-                    <p className="text-xs text-secondary-foreground/80">{t('سلسلة', 'Streak')}</p>
-                  </div>
-                  <div className="rounded-xl bg-white/10 p-3">
-                    <p className="text-2xl font-bold">{userStats.totalAchievements}</p>
-                    <p className="text-xs text-secondary-foreground/80">{t('إنجازات', 'Badges')}</p>
+                <div className="flex flex-col items-end gap-4">
+                  <Button 
+                    variant="secondary" 
+                    className="gap-2 bg-white/20 hover:bg-white/30 text-secondary-foreground"
+                    onClick={() => celebrateAchievement()}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {t('احتفل!', 'Celebrate!')}
+                  </Button>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="rounded-xl bg-white/10 p-3">
+                      <p className="text-2xl font-bold">{userStats.rank}</p>
+                      <p className="text-xs text-secondary-foreground/80">{t('الترتيب', 'Rank')}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/10 p-3">
+                      <p className="text-2xl font-bold">{userStats.streak}</p>
+                      <p className="text-xs text-secondary-foreground/80">{t('سلسلة', 'Streak')}</p>
+                    </div>
+                    <div className="rounded-xl bg-white/10 p-3">
+                      <p className="text-2xl font-bold">{userStats.totalAchievements}</p>
+                      <p className="text-xs text-secondary-foreground/80">{t('إنجازات', 'Badges')}</p>
+                    </div>
                   </div>
                 </div>
               </div>

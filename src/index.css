@@ -392,3 +392,107 @@
 ::selection {
   @apply bg-secondary/30 text-foreground;
 }
+
+/* Print Styles */
+@media print {
+  /* Hide non-essential elements */
+  .no-print,
+  [data-sidebar],
+  nav,
+  .sidebar,
+  button:not(.print-button),
+  .mobile-nav,
+  .toast,
+  .dialog-overlay {
+    display: none !important;
+  }
+
+  /* Reset backgrounds for printing */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+  }
+
+  /* Ensure content is visible */
+  .print-content,
+  main {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 20px !important;
+  }
+
+  /* Card styles for print */
+  .card,
+  [class*="card"] {
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Table styles for print */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  th, td {
+    border: 1px solid #ddd !important;
+    padding: 8px !important;
+    text-align: start !important;
+  }
+
+  /* Links */
+  a {
+    color: black !important;
+    text-decoration: underline !important;
+  }
+
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+  }
+
+  /* Page breaks */
+  h1, h2, h3 {
+    page-break-after: avoid;
+  }
+
+  /* Header for printed pages */
+  .print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 20px;
+    border-bottom: 2px solid #1E3A8A;
+    padding-bottom: 10px;
+  }
+
+  .print-footer {
+    display: block !important;
+    text-align: center;
+    margin-top: 20px;
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Charts - show as data tables instead */
+  .recharts-wrapper {
+    display: none !important;
+  }
+
+  .chart-print-fallback {
+    display: block !important;
+  }
+}
+
+/* Utility class to show only in print */
+.print-only {
+  display: none !important;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+}
