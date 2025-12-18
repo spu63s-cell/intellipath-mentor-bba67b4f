@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CardGlass, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -12,7 +13,7 @@ import { useCareerPaths, CareerPath } from '@/hooks/useCareerPaths';
 import { 
   Briefcase, Target, TrendingUp, BookOpen, Award, ChevronRight, 
   Code, Database, Brain, Palette, Globe, Shield, Rocket, CheckCircle2,
-  Network, Heart, Cpu, Loader2
+  Network, Heart, Cpu, MapPin, DollarSign, Sparkles
 } from 'lucide-react';
 
 // Icon mapping
@@ -42,59 +43,54 @@ interface CareerPathWithProgress extends CareerPath {
 }
 
 export default function Career() {
+  const { t } = useTranslation();
   const { language } = useLanguageStore();
   const isRTL = language === 'ar';
   const { careerPaths, isLoading } = useCareerPaths();
   const [selectedPath, setSelectedPath] = useState<CareerPathWithProgress | null>(null);
 
-  const texts = {
-    title: isRTL ? 'المسار المهني' : 'Career Planner',
-    subtitle: isRTL ? 'خطط لمستقبلك المهني' : 'Plan your career path',
-    paths: isRTL ? 'المسارات المهنية' : 'Career Paths',
-    roadmap: isRTL ? 'خريطة الطريق' : 'Roadmap',
-    skills: isRTL ? 'المهارات' : 'Skills',
-    explore: isRTL ? 'استكشف' : 'Explore',
-    salary: isRTL ? 'الراتب المتوقع' : 'Expected Salary',
-    demand: isRTL ? 'الطلب في السوق' : 'Market Demand',
-    high: isRTL ? 'مرتفع' : 'High',
-    medium: isRTL ? 'متوسط' : 'Medium',
-    low: isRTL ? 'منخفض' : 'Low',
-    progress: isRTL ? 'التقدم' : 'Progress',
-    requiredCourses: isRTL ? 'المقررات المطلوبة' : 'Required Courses',
-    requiredSkills: isRTL ? 'المهارات المطلوبة' : 'Required Skills',
-    yourMilestones: isRTL ? 'إنجازاتك' : 'Your Milestones',
-    startPath: isRTL ? 'ابدأ هذا المسار' : 'Start This Path',
-  };
-
   const getDemandBadge = (demand: string) => {
     switch (demand) {
       case 'high':
-        return <Badge className="bg-green-500">{texts.high}</Badge>;
+        return <Badge className="bg-gradient-to-r from-emerald-500 to-green-600 text-white border-0">{t('career.high')}</Badge>;
       case 'medium':
-        return <Badge className="bg-yellow-500">{texts.medium}</Badge>;
+        return <Badge className="bg-gradient-to-r from-amber-500 to-yellow-600 text-white border-0">{t('career.medium')}</Badge>;
       default:
-        return <Badge className="bg-gray-500">{texts.low}</Badge>;
+        return <Badge className="bg-gradient-to-r from-slate-500 to-gray-600 text-white border-0">{t('career.low')}</Badge>;
     }
   };
 
   return (
     <MainLayout>
       <div className="p-4 md:p-6 space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">{texts.title}</h1>
-          <p className="text-muted-foreground">{texts.subtitle}</p>
-        </div>
+        {/* Header with gradient */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative"
+        >
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary to-secondary text-white shadow-glow">
+              <Briefcase className="h-6 w-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                {t('career.title')}
+              </h1>
+              <p className="text-muted-foreground">{t('career.subtitle')}</p>
+            </div>
+          </div>
+        </motion.div>
 
         <Tabs defaultValue="paths" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="paths" className="gap-2">
+          <TabsList className="glass p-1">
+            <TabsTrigger value="paths" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-white">
               <Briefcase className="h-4 w-4" />
-              {texts.paths}
+              {t('career.paths')}
             </TabsTrigger>
-            <TabsTrigger value="roadmap" className="gap-2">
+            <TabsTrigger value="roadmap" className="gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-primary data-[state=active]:to-secondary data-[state=active]:text-white">
               <Target className="h-4 w-4" />
-              {texts.roadmap}
+              {t('career.roadmap')}
             </TabsTrigger>
           </TabsList>
 
@@ -103,7 +99,7 @@ export default function Career() {
             {isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2, 3].map(i => (
-                  <Card key={i}>
+                  <CardGlass key={i}>
                     <CardHeader>
                       <Skeleton className="h-12 w-12 rounded-xl" />
                       <Skeleton className="h-6 w-3/4 mt-4" />
@@ -112,56 +108,70 @@ export default function Career() {
                     <CardContent>
                       <Skeleton className="h-2 w-full" />
                     </CardContent>
-                  </Card>
+                  </CardGlass>
                 ))}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {careerPaths.map((path: CareerPathWithProgress) => {
+                {careerPaths.map((path: CareerPathWithProgress, index: number) => {
                   const Icon = iconMap[path.icon] || Code;
                   return (
                     <motion.div
                       key={path.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      whileHover={{ scale: 1.02 }}
+                      transition={{ delay: index * 0.1 }}
+                      whileHover={{ y: -5, scale: 1.02 }}
                     >
-                      <Card 
-                        className={`cursor-pointer transition-all hover:shadow-lg ${
-                          selectedPath?.id === path.id ? 'ring-2 ring-primary' : ''
+                      <CardGlass 
+                        className={`cursor-pointer transition-all duration-300 hover:shadow-xl group ${
+                          selectedPath?.id === path.id ? 'ring-2 ring-primary shadow-glow' : ''
                         }`}
                         onClick={() => setSelectedPath(path)}
                       >
                         <CardHeader>
                           <div className="flex items-start justify-between">
-                            <div className={`p-3 rounded-xl ${path.color}`}>
+                            <motion.div 
+                              className={`p-3 rounded-xl ${path.color} shadow-lg group-hover:scale-110 transition-transform`}
+                              whileHover={{ rotate: [0, -10, 10, 0] }}
+                            >
                               <Icon className="h-6 w-6 text-white" />
-                            </div>
+                            </motion.div>
                             {getDemandBadge(path.demand)}
                           </div>
-                          <CardTitle className="mt-4">
+                          <CardTitle className="mt-4 group-hover:text-primary transition-colors">
                             {isRTL ? path.titleAr : path.title}
                           </CardTitle>
-                          <CardDescription>
+                          <CardDescription className="line-clamp-2">
                             {isRTL ? path.descriptionAr : path.description}
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             <div>
-                              <div className="flex justify-between text-sm mb-1">
-                                <span className="text-muted-foreground">{texts.progress}</span>
-                                <span className="font-medium">{path.progress}%</span>
+                              <div className="flex justify-between text-sm mb-2">
+                                <span className="text-muted-foreground">{t('career.progress')}</span>
+                                <span className="font-semibold text-primary">{path.progress}%</span>
                               </div>
-                              <Progress value={path.progress} className="h-2" />
+                              <div className="relative h-2 rounded-full bg-muted overflow-hidden">
+                                <motion.div
+                                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-secondary rounded-full"
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${path.progress}%` }}
+                                  transition={{ duration: 1, delay: 0.2 }}
+                                />
+                              </div>
                             </div>
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">{texts.salary}</span>
-                              <span className="font-medium">{path.salaryRange}</span>
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <DollarSign className="h-4 w-4" />
+                                <span>{t('career.salary')}</span>
+                              </div>
+                              <span className="font-semibold">{path.salaryRange}</span>
                             </div>
                           </div>
                         </CardContent>
-                      </Card>
+                      </CardGlass>
                     </motion.div>
                   );
                 })}
@@ -174,49 +184,49 @@ export default function Career() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Card>
-                  <CardHeader>
+                <CardGlass className="overflow-hidden">
+                  <div className={`${selectedPath.color} p-6`}>
                     <div className="flex items-center gap-4">
-                      <div className={`p-4 rounded-xl ${selectedPath.color}`}>
+                      <div className="p-4 rounded-2xl bg-white/20 backdrop-blur-sm">
                         {(() => {
                           const Icon = iconMap[selectedPath.icon] || Code;
                           return <Icon className="h-8 w-8 text-white" />;
                         })()}
                       </div>
-                      <div>
-                        <CardTitle className="text-xl">
+                      <div className="text-white">
+                        <CardTitle className="text-xl text-white">
                           {isRTL ? selectedPath.titleAr : selectedPath.title}
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-white/80">
                           {isRTL ? selectedPath.descriptionAr : selectedPath.description}
                         </CardDescription>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
+                  </div>
+                  <CardContent className="p-6 space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <h4 className="font-medium mb-3 flex items-center gap-2">
-                          <Award className="h-4 w-4" />
-                          {texts.requiredSkills}
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <Award className="h-4 w-4 text-primary" />
+                          {t('career.requiredSkills')}
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {(isRTL ? selectedPath.skillsAr : selectedPath.skills).map((skill: string) => (
-                            <Badge key={skill} variant="secondary">{skill}</Badge>
+                            <Badge key={skill} variant="secondary" className="glass">{skill}</Badge>
                           ))}
                         </div>
                       </div>
                       <div>
-                        <h4 className="font-medium mb-3 flex items-center gap-2">
-                          <BookOpen className="h-4 w-4" />
-                          {texts.requiredCourses}
+                        <h4 className="font-semibold mb-3 flex items-center gap-2">
+                          <BookOpen className="h-4 w-4 text-primary" />
+                          {t('career.requiredCourses')}
                         </h4>
                         <div className="flex flex-wrap gap-2">
                           {selectedPath.courses.map((course: string) => (
                             <Badge 
                               key={course} 
                               variant={selectedPath.completedCourses.includes(course) ? "default" : "outline"}
-                              className={selectedPath.completedCourses.includes(course) ? "bg-green-500" : ""}
+                              className={selectedPath.completedCourses.includes(course) ? "bg-gradient-to-r from-emerald-500 to-green-600 text-white border-0" : ""}
                             >
                               {selectedPath.completedCourses.includes(course) && (
                                 <CheckCircle2 className="h-3 w-3 me-1" />
@@ -227,23 +237,26 @@ export default function Career() {
                         </div>
                       </div>
                     </div>
-                    <Button className="w-full md:w-auto gap-2">
+                    <Button variant="gradient" className="w-full md:w-auto gap-2">
                       <Rocket className="h-4 w-4" />
-                      {texts.startPath}
+                      {t('career.startPath')}
                     </Button>
                   </CardContent>
-                </Card>
+                </CardGlass>
               </motion.div>
             )}
           </TabsContent>
 
           {/* Roadmap Tab */}
           <TabsContent value="roadmap">
-            <Card>
+            <CardGlass>
               <CardHeader>
-                <CardTitle>{texts.yourMilestones}</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  {t('career.yourMilestones')}
+                </CardTitle>
                 <CardDescription>
-                  {isRTL ? 'تتبع تقدمك نحو أهدافك المهنية' : 'Track your progress towards career goals'}
+                  {t('career.trackProgress')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -251,39 +264,41 @@ export default function Career() {
                   {milestones.map((milestone, index) => (
                     <motion.div 
                       key={milestone.id}
-                      initial={{ opacity: 0, x: -20 }}
+                      initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
-                      className={`flex items-center gap-4 p-4 rounded-lg border ${
-                        milestone.completed ? 'bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900' : ''
+                      className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${
+                        milestone.completed 
+                          ? 'bg-gradient-to-r from-emerald-500/10 to-green-500/10 border-emerald-500/30' 
+                          : 'glass border-border/50 hover:border-primary/30'
                       }`}
                     >
-                      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${
+                      <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
                         milestone.completed 
-                          ? 'bg-green-500 text-white' 
+                          ? 'bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-lg shadow-emerald-500/30' 
                           : 'bg-muted text-muted-foreground'
                       }`}>
                         {milestone.completed ? (
-                          <CheckCircle2 className="h-5 w-5" />
+                          <CheckCircle2 className="h-6 w-6" />
                         ) : (
-                          <span className="font-medium">{index + 1}</span>
+                          <span className="font-bold">{index + 1}</span>
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className={`font-medium ${milestone.completed ? 'text-green-700 dark:text-green-400' : ''}`}>
+                        <p className={`font-semibold ${milestone.completed ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
                           {isRTL ? milestone.titleAr : milestone.title}
                         </p>
                       </div>
                       {!milestone.completed && (
-                        <Button variant="outline" size="sm">
-                          {isRTL ? 'ابدأ' : 'Start'}
+                        <Button variant="outline" size="sm" className="glass">
+                          {t('common.start')}
                         </Button>
                       )}
                     </motion.div>
                   ))}
                 </div>
               </CardContent>
-            </Card>
+            </CardGlass>
           </TabsContent>
         </Tabs>
       </div>
