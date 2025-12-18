@@ -163,7 +163,7 @@ export default function LearningStyle() {
 
   const progress = ((currentQuestion + 1) / questions.length) * 100;
   const results = calculateResults();
-  const dominantStyle = results[0];
+  const dominantStyle = results.length > 0 ? results[0] : { type: 'V' as const, count: 0, percentage: 0 };
 
   const texts = {
     title: isRTL ? 'تحليل أسلوب التعلم' : 'Learning Style Analysis',
@@ -276,6 +276,16 @@ export default function LearningStyle() {
   }
 
   const question = questions[currentQuestion];
+
+  if (!question) {
+    return (
+      <MainLayout>
+        <div className="p-4 md:p-6 max-w-2xl mx-auto">
+          <p className="text-muted-foreground">{isRTL ? 'جاري التحميل...' : 'Loading...'}</p>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
