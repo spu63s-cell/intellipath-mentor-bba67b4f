@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useToast } from '@/hooks/use-toast';
 import { useAdvisorStats } from '@/hooks/useAdvisorStats';
+import { useEarlyWarning } from '@/hooks/useEarlyWarning';
 import { exportAdvisorStatsToExcel, exportStudentListToExcel } from '@/utils/excelExport';
 import { 
   AlertTriangle, TrendingDown, TrendingUp, Users, Search, Filter,
@@ -196,6 +197,7 @@ export default function AdvisorDashboard() {
   const { language } = useLanguageStore();
   const { toast } = useToast();
   const { stats, isLoading: statsLoading } = useAdvisorStats();
+  const { runCheck: runEarlyWarning, isLoading: warningLoading, result: warningResult } = useEarlyWarning();
   const isRTL = language === 'ar';
 
   const [students] = useState<Student[]>(mockStudents);
@@ -306,6 +308,18 @@ export default function AdvisorDashboard() {
             <p className="text-muted-foreground">{texts.subtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Button 
+              variant="default" 
+              className="gap-2"
+              onClick={runEarlyWarning}
+              disabled={warningLoading}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              {warningLoading 
+                ? (isRTL ? 'جاري الفحص...' : 'Checking...')
+                : (isRTL ? 'فحص الإنذار المبكر' : 'Run Early Warning')
+              }
+            </Button>
             <Button 
               variant="outline" 
               className="gap-2"

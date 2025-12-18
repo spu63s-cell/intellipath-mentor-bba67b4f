@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Mail,
   CalendarDays,
+  Info,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -219,6 +220,15 @@ export function AppSidebar() {
             >
               <Settings className="h-5 w-5" />
               {!collapsed && <span>{t('الإعدادات', 'Settings')}</span>}
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={() => navigate('/about')}
+              tooltip={collapsed ? t('حول النظام', 'About') : undefined}
+            >
+              <Info className="h-5 w-5" />
+              {!collapsed && <span>{t('حول النظام', 'About')}</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
