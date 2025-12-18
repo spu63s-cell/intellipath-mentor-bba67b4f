@@ -6,14 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useDeadlines } from '@/hooks/useDeadlines';
 import { useToast } from '@/hooks/use-toast';
+import { DeadlineCalendar } from '@/components/deadlines/DeadlineCalendar';
 import { 
   Calendar, Plus, Clock, AlertTriangle, CheckCircle2, Trash2,
-  CalendarDays, BookOpen
+  CalendarDays, BookOpen, List
 } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { ar, enUS } from 'date-fns/locale';
@@ -133,6 +135,8 @@ export default function Deadlines() {
     overdue: isRTL ? 'متأخرة' : 'Overdue',
     upcoming: isRTL ? 'قادمة' : 'Upcoming',
     all: isRTL ? 'جميع المواعيد' : 'All Deadlines',
+    listView: isRTL ? 'قائمة' : 'List',
+    calendarView: isRTL ? 'تقويم' : 'Calendar',
   };
 
   const statusConfig = {
@@ -268,83 +272,102 @@ export default function Deadlines() {
           </Card>
         </div>
 
-        {/* Deadlines List */}
-        <div className="space-y-3">
-          {isLoading ? (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">Loading...</CardContent></Card>
-          ) : deadlines.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                <CalendarDays className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                {texts.noDeadlines}
-              </CardContent>
-            </Card>
-          ) : (
-            deadlines.map((deadline) => {
-              const status = getDeadlineStatus(deadline.due_date);
-              const config = statusConfig[status as keyof typeof statusConfig];
-              const StatusIcon = config.icon;
-              const title = isRTL ? (deadline.title_ar || deadline.title) : deadline.title;
+        {/* Tabs for List/Calendar View */}
+        <Tabs defaultValue="list" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="list" className="gap-2">
+              <List className="h-4 w-4" />
+              {texts.listView}
+            </TabsTrigger>
+            <TabsTrigger value="calendar" className="gap-2">
+              <Calendar className="h-4 w-4" />
+              {texts.calendarView}
+            </TabsTrigger>
+          </TabsList>
 
-              return (
-                <motion.div
-                  key={deadline.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <Card className={`transition-all ${status === 'overdue' ? 'border-red-300 dark:border-red-800' : status === 'urgent' ? 'border-orange-300 dark:border-orange-800' : ''}`}>
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 flex-1">
-                          <div className={`p-2 rounded-full bg-muted ${config.color}`}>
-                            <StatusIcon className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-medium">{title}</h3>
-                              <Badge variant={config.badge as any}>{getDaysRemaining(deadline.due_date)}</Badge>
-                              {deadline.course && (
-                                <Badge variant="outline" className="gap-1">
-                                  <BookOpen className="h-3 w-3" />
-                                  {deadline.course.code}
-                                </Badge>
-                              )}
+          {/* List View */}
+          <TabsContent value="list" className="space-y-3">
+            {isLoading ? (
+              <Card><CardContent className="p-8 text-center text-muted-foreground">Loading...</CardContent></Card>
+            ) : deadlines.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  <CalendarDays className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  {texts.noDeadlines}
+                </CardContent>
+              </Card>
+            ) : (
+              deadlines.map((deadline) => {
+                const status = getDeadlineStatus(deadline.due_date);
+                const config = statusConfig[status as keyof typeof statusConfig];
+                const StatusIcon = config.icon;
+                const title = isRTL ? (deadline.title_ar || deadline.title) : deadline.title;
+
+                return (
+                  <motion.div
+                    key={deadline.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <Card className={`transition-all ${status === 'overdue' ? 'border-red-300 dark:border-red-800' : status === 'urgent' ? 'border-orange-300 dark:border-orange-800' : ''}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 flex-1">
+                            <div className={`p-2 rounded-full bg-muted ${config.color}`}>
+                              <StatusIcon className="h-4 w-4" />
                             </div>
-                            {deadline.description && (
-                              <p className="text-sm text-muted-foreground mt-1">{deadline.description}</p>
-                            )}
-                            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {formatDate(deadline.due_date)}
-                            </p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-medium">{title}</h3>
+                                <Badge variant={config.badge as any}>{getDaysRemaining(deadline.due_date)}</Badge>
+                                {deadline.course && (
+                                  <Badge variant="outline" className="gap-1">
+                                    <BookOpen className="h-3 w-3" />
+                                    {deadline.course.code}
+                                  </Badge>
+                                )}
+                              </div>
+                              {deadline.description && (
+                                <p className="text-sm text-muted-foreground mt-1">{deadline.description}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {formatDate(deadline.due_date)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-green-600 hover:text-green-700 hover:bg-green-100"
+                              onClick={() => handleComplete(deadline.id)}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-100"
+                              onClick={() => handleDelete(deadline.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-green-600 hover:text-green-700 hover:bg-green-100"
-                            onClick={() => handleComplete(deadline.id)}
-                          >
-                            <CheckCircle2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-100"
-                            onClick={() => handleDelete(deadline.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })
-          )}
-        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              })
+            )}
+          </TabsContent>
+
+          {/* Calendar View */}
+          <TabsContent value="calendar">
+            <DeadlineCalendar deadlines={deadlines} />
+          </TabsContent>
+        </Tabs>
       </div>
     </MainLayout>
   );
