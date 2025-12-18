@@ -14,6 +14,7 @@ import { useLanguageStore } from '@/stores/languageStore';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import NotificationBell from '@/components/notifications/NotificationBell';
 
 export function Navbar() {
   const navigate = useNavigate();
@@ -50,6 +51,8 @@ export function Navbar() {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Notifications */}
+          {user && <NotificationBell />}
           {/* Language Toggle */}
           <Button
             variant="ghost"
