@@ -62,6 +62,35 @@ export type Database = {
         }
         Relationships: []
       }
+      advisor_student_assignments: {
+        Row: {
+          advisor_id: string
+          assigned_at: string
+          id: string
+          student_id: string
+        }
+        Insert: {
+          advisor_id: string
+          assigned_at?: string
+          id?: string
+          student_id: string
+        }
+        Update: {
+          advisor_id?: string
+          assigned_at?: string
+          id?: string
+          student_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advisor_student_assignments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_conversations: {
         Row: {
           created_at: string
