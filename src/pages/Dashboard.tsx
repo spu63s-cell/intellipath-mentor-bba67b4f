@@ -75,17 +75,20 @@ export default function Dashboard() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
-          <Card className="overflow-hidden border-0 gradient-hero text-primary-foreground">
-            <CardContent className="p-6 md:p-8">
-              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+          <Card className="overflow-hidden border-0 bg-gradient-to-br from-slate-800 via-slate-900 to-teal-900 dark:from-slate-900 dark:via-slate-950 dark:to-teal-950 text-white shadow-xl">
+            <CardContent className="p-6 md:p-8 relative">
+              {/* Background decoration */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-teal-500/20 to-transparent rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative z-10">
                 <div className="space-y-2">
-                  <p className="text-primary-foreground/80">
+                  <p className="text-white/70 text-sm">
                     {t('مرحباً بك', 'Welcome back')},
                   </p>
-                  <h1 className="text-2xl font-bold md:text-3xl">
+                  <h1 className="text-2xl font-bold md:text-3xl text-teal-300">
                     {language === 'ar' ? displayData.name : displayData.nameEn}
                   </h1>
-                  <p className="text-sm text-primary-foreground/70">
+                  <p className="text-sm text-white/60">
                     {displayData.department} • {t('السنة', 'Year')} {displayData.year}
                   </p>
                 </div>
@@ -109,13 +112,13 @@ export default function Dashboard() {
                       semester: e.semester,
                     }))}
                   />
-                  <div className="rounded-xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
-                    <p className="text-xs text-primary-foreground/70">{t('المعدل التراكمي', 'GPA')}</p>
-                    <p className="text-2xl font-bold">{displayData.gpa.toFixed(2)}</p>
+                  <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/10">
+                    <p className="text-xs text-white/60">{t('المعدل التراكمي', 'GPA')}</p>
+                    <p className="text-2xl font-bold text-white">{displayData.gpa.toFixed(2)}</p>
                   </div>
-                  <div className="rounded-xl bg-primary-foreground/10 px-4 py-3 backdrop-blur-sm">
-                    <p className="text-xs text-primary-foreground/70">{t('الساعات المكتسبة', 'Credits')}</p>
-                    <p className="text-2xl font-bold">{displayData.totalCredits}</p>
+                  <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/10">
+                    <p className="text-xs text-white/60">{t('الساعات المكتسبة', 'Credits')}</p>
+                    <p className="text-2xl font-bold text-white">{displayData.totalCredits}</p>
                   </div>
                 </div>
               </div>
