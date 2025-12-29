@@ -1,4 +1,5 @@
-import { motion } from 'framer-motion';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -12,17 +13,24 @@ import {
   ChevronLeft,
   ChevronRight,
   Award,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  Brain,
+  Shield,
+  Lightbulb
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardGlass, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useStudentDashboard } from '@/hooks/useStudentDashboard';
 import { ExportReportButton } from '@/components/dashboard/ExportReportButton';
 import { useAuthStore } from '@/stores/authStore';
+import { useAcademicAnalysis } from '@/hooks/api/useAcademicAnalysis';
+import { supabase } from '@/integrations/supabase/client';
 
 // Mock data for demonstration when no real data exists
 const mockDeadlines = [
@@ -30,6 +38,147 @@ const mockDeadlines = [
   { title: 'امتحان الشبكات', titleEn: 'Networks Exam', date: '2024-01-25', daysLeft: 8 },
   { title: 'واجب قواعد البيانات', titleEn: 'Database Assignment', date: '2024-01-18', daysLeft: 1 },
 ];
+
+// AI Insights Component
+function AIInsightsCard({ gpa, yearLevel, language }: { gpa: number; yearLevel: number; language: string }) {
+  const isRTL = language === 'ar';
+  const { getRiskAssessment, isLoading } = useAcademicAnalysis();
+  const [riskData, setRiskData] = useState<any>(null);
+
+  useEffect(() => {
+    if (gpa > 0) {
+      getRiskAssessment(gpa, undefined, yearLevel)
+        .then(setRiskData)
+        .catch(() => {});
+    }
+  }, [gpa, yearLevel]);
+
+  const getRiskColor = (level: string) => {
+    switch (level) {
+      case 'low': return 'bg-emerald-500 text-white';
+      case 'medium': return 'bg-amber-500 text-white';
+      case 'high': return 'bg-orange-500 text-white';
+      case 'critical': return 'bg-red-500 text-white';
+      default: return 'bg-muted';
+    }
+  };
+
+  const getRiskBorderColor = (level: string) => {
+    switch (level) {
+      case 'low': return 'border-emerald-500/30 bg-emerald-500/5';
+      case 'medium': return 'border-amber-500/30 bg-amber-500/5';
+      case 'high': return 'border-orange-500/30 bg-orange-500/5';
+      case 'critical': return 'border-red-500/30 bg-red-500/5';
+      default: return 'border-border';
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <CardGlass>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Brain className="h-5 w-5 text-primary" />
+            {isRTL ? 'تحليل ذكي' : 'AI Insights'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        </CardContent>
+      </CardGlass>
+    );
+  }
+
+  return (
+    <CardGlass className={`border ${riskData ? getRiskBorderColor(riskData.riskLevel) : ''}`}>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Brain className="h-5 w-5 text-primary" />
+          {isRTL ? 'تحليل ذكي' : 'AI Insights'}
+          {riskData && (
+            <Badge className={`${getRiskColor(riskData.riskLevel)} text-xs`}>
+              {riskData.riskLevel === 'low' ? (isRTL ? 'منخفض' : 'Low Risk') :
+               riskData.riskLevel === 'medium' ? (isRTL ? 'متوسط' : 'Medium Risk') :
+               riskData.riskLevel === 'high' ? (isRTL ? 'مرتفع' : 'High Risk') :
+               (isRTL ? 'حرج' : 'Critical')}
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {riskData ? (
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="space-y-4"
+            >
+              {/* Risk Score */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className={`h-5 w-5 ${
+                    riskData.riskLevel === 'low' ? 'text-emerald-500' :
+                    riskData.riskLevel === 'medium' ? 'text-amber-500' :
+                    riskData.riskLevel === 'high' ? 'text-orange-500' :
+                    'text-red-500'
+                  }`} />
+                  <span className="text-sm font-medium">
+                    {isRTL ? 'مستوى المخاطر' : 'Risk Score'}
+                  </span>
+                </div>
+                <span className="text-2xl font-bold">{riskData.riskScore}%</span>
+              </div>
+              
+              <Progress 
+                value={100 - riskData.riskScore} 
+                className="h-2"
+              />
+
+              {/* Predicted GPA */}
+              {riskData.predictedGpa && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                  <span className="text-sm">{isRTL ? 'المعدل المتوقع' : 'Predicted GPA'}</span>
+                  <span className="font-bold">{riskData.predictedGpa.toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {riskData.recommendations?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Lightbulb className="h-3.5 w-3.5" />
+                    {isRTL ? 'توصيات:' : 'Recommendations:'}
+                  </p>
+                  {riskData.recommendations.slice(0, 2).map((rec: string, i: number) => (
+                    <motion.p 
+                      key={i}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className="text-xs text-muted-foreground bg-muted/30 p-2 rounded"
+                    >
+                      • {rec}
+                    </motion.p>
+                  ))}
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-6 text-center">
+            <Sparkles className="h-8 w-8 text-muted-foreground/50 mb-2" />
+            <p className="text-sm text-muted-foreground">
+              {isRTL ? 'أضف معدلك لتفعيل التحليل الذكي' : 'Add your GPA to enable AI analysis'}
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </CardGlass>
+  );
+}
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -273,6 +422,19 @@ export default function Dashboard() {
             </CardGlass>
           </motion.div>
 
+          {/* AI Insights */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.35 }}
+          >
+            <AIInsightsCard 
+              gpa={displayData.gpa} 
+              yearLevel={displayData.year}
+              language={language}
+            />
+          </motion.div>
+
           {/* Achievements */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -369,39 +531,49 @@ export default function Dashboard() {
             </CardGlass>
           </motion.div>
 
-          {/* GPA Calculator Widget */}
+          {/* Quick AI Chat */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
+            transition={{ duration: 0.5, delay: 0.55 }}
           >
-            <CardGlass className="bg-gradient-to-br from-secondary/10 to-primary/10 border-secondary/20">
+            <CardGlass className="h-full bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                  <TrendingUp className="h-5 w-5 text-secondary" />
-                  {t('dashboard.quickActions.gpa')}
+                  <Brain className="h-5 w-5 text-primary" />
+                  {isRTL ? 'المستشار الذكي' : 'AI Advisor'}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="text-center">
-                    <p className="text-5xl font-bold bg-gradient-to-r from-secondary to-primary bg-clip-text text-transparent">{displayData.gpa.toFixed(2)}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{isRTL ? 'المعدل التراكمي الحالي' : 'Current GPA'}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 text-center">
-                    <div className="rounded-xl bg-background/80 p-3 border border-border/50">
-                      <p className="text-xl font-bold">{displayData.totalCredits}</p>
-                      <p className="text-xs text-muted-foreground">{isRTL ? 'ساعة مكتسبة' : 'Credits Earned'}</p>
-                    </div>
-                    <div className="rounded-xl bg-background/80 p-3 border border-border/50">
-                      <p className="text-xl font-bold">{Math.max(0, 132 - displayData.totalCredits)}</p>
-                      <p className="text-xs text-muted-foreground">{isRTL ? 'ساعة متبقية' : 'Credits Left'}</p>
-                    </div>
-                  </div>
-                  <Button variant="gradient" className="w-full" onClick={() => navigate('/simulator')}>
-                    {isRTL ? 'حساب المعدل المتوقع' : 'Calculate Expected GPA'}
-                  </Button>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  {isRTL 
+                    ? 'اسأل المستشار الذكي عن أي شيء يتعلق بدراستك'
+                    : 'Ask the AI advisor about anything related to your studies'}
+                </p>
+                <div className="space-y-2">
+                  {[
+                    { ar: 'ما هي المتطلبات السابقة لمقرر CS301؟', en: 'Prerequisites for CS301?' },
+                    { ar: 'كيف أحسن معدلي؟', en: 'How to improve my GPA?' },
+                    { ar: 'ما هي الخطة الأمثل للتخرج؟', en: 'Best graduation plan?' },
+                  ].map((q, i) => (
+                    <Button
+                      key={i}
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start text-left text-xs h-auto py-2 hover:bg-primary/10"
+                      onClick={() => navigate('/chat')}
+                    >
+                      {isRTL ? q.ar : q.en}
+                    </Button>
+                  ))}
                 </div>
+                <Button 
+                  className="w-full gap-2"
+                  onClick={() => navigate('/chat')}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  {isRTL ? 'بدء محادثة' : 'Start Chat'}
+                </Button>
               </CardContent>
             </CardGlass>
           </motion.div>
