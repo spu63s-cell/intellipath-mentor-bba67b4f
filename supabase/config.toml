@@ -1,1 +1,45 @@
 project_id = "exiinumslsvzssrmocmz"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+
+# Chat Edge Function (Basic AI Chat)
+[functions.chat]
+verify_jwt = false
+
+# Agentic RAG Chat (Advanced with Tool Calling)
+[functions.agentic-chat]
+verify_jwt = false
+
+# RAG Query (Retrieval Augmented Generation)
+[functions.rag-query]
+verify_jwt = false
+
+# Academic Analysis (GPA, Risk, Simulations)
+[functions.academic-analysis]
+verify_jwt = false
+
+# Early Warning System
+[functions.early-warning]
+verify_jwt = false
