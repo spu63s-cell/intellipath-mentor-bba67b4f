@@ -1,12 +1,48 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// RAG System Prompt
+// =============================================================================
+// ERROR HANDLING
+// =============================================================================
+function createErrorResponse(code: string, message: string, message_ar: string, status: number) {
+  return new Response(
+    JSON.stringify({ error: { code, message, message_ar } }),
+    { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+  );
+}
+
+// =============================================================================
+// INPUT VALIDATION
+// =============================================================================
+const StudentContextSchema = z.object({
+  gpa: z.number().min(0).max(4).optional(),
+  department: z.string().max(100).optional(),
+  year_level: z.number().min(1).max(6).optional(),
+}).optional();
+
+const FiltersSchema = z.object({
+  department: z.string().max(100).optional(),
+  year_level: z.number().min(1).max(6).optional(),
+}).optional();
+
+const RequestSchema = z.object({
+  query: z.string().min(1).max(2000).transform(s => s.trim()),
+  conversation_id: z.string().uuid().optional(),
+  filters: FiltersSchema,
+  use_hybrid_search: z.boolean().default(true),
+  top_k: z.number().min(1).max(20).default(5),
+  student_context: StudentContextSchema,
+});
+
+// =============================================================================
+// RAG SYSTEM PROMPT
+// =============================================================================
 const RAG_SYSTEM_PROMPT = `أنت "IntelliPath" - المستشار الأكاديمي الذكي للجامعة السورية الخاصة.
 
 ## مهمتك:
@@ -25,33 +61,45 @@ const RAG_SYSTEM_PROMPT = `أنت "IntelliPath" - المستشار الأكاد�
 ## ملاحظة:
 إذا كان السؤال خارج نطاق المعلومات المتاحة، اعترف بذلك واقترح مصادر بديلة.`;
 
-// Simple keyword-based search (simulating vector search)
-async function searchDocuments(query: string, supabase: any, filters?: any) {
-  const keywords = query.split(/\s+/).filter(k => k.length > 2);
+// =============================================================================
+// SEARCH FUNCTIONS
+// =============================================================================
+
+// Sanitize search input to prevent injection
+function sanitizeSearchInput(input: string): string {
+  return input
+    .trim()
+    .slice(0, 200)
+    .replace(/[%_\\'"]/g, '') // Remove SQL special chars
+    .replace(/\s+/g, ' '); // Normalize whitespace
+}
+
+async function searchDocuments(query: string, supabase: any, filters?: z.infer<typeof FiltersSchema>, limit = 10) {
+  const sanitized = sanitizeSearchInput(query);
+  const keywords = sanitized.split(/\s+/).filter(k => k.length > 2);
   
   let queryBuilder = supabase
     .from('courses')
-    .select('code, name, name_ar, description, description_ar, credits, year_level, department');
+    .select('code, name, name_ar, description, description_ar, credits, year_level, department')
+    .eq('is_active', true);
   
   // Apply text search
   if (keywords.length > 0) {
     const searchConditions = keywords.map(keyword => 
-      `name.ilike.%${keyword}%,name_ar.ilike.%${keyword}%,description.ilike.%${keyword}%,description_ar.ilike.%${keyword}%`
+      `name.ilike.%${keyword}%,name_ar.ilike.%${keyword}%,description.ilike.%${keyword}%,description_ar.ilike.%${keyword}%,code.ilike.%${keyword}%`
     ).join(',');
     queryBuilder = queryBuilder.or(searchConditions);
   }
   
   // Apply filters
   if (filters?.department) {
-    queryBuilder = queryBuilder.eq('department', filters.department);
+    queryBuilder = queryBuilder.eq('department', sanitizeSearchInput(filters.department));
   }
   if (filters?.year_level) {
     queryBuilder = queryBuilder.eq('year_level', filters.year_level);
   }
   
-  queryBuilder = queryBuilder.eq('is_active', true).limit(10);
-  
-  const { data, error } = await queryBuilder;
+  const { data, error } = await queryBuilder.limit(limit);
   
   if (error) {
     console.error("Search error:", error);
@@ -61,32 +109,28 @@ async function searchDocuments(query: string, supabase: any, filters?: any) {
   return data || [];
 }
 
-// Build context from search results
 function buildContext(documents: any[]): string {
   if (!documents || documents.length === 0) {
     return "لا توجد وثائق متاحة للسؤال المطروح.";
   }
   
-  return documents.map((doc, index) => {
-    return `
+  return documents.map((doc, index) => `
 ### المقرر ${index + 1}: ${doc.name_ar || doc.name} (${doc.code})
 - القسم: ${doc.department}
 - السنة: ${doc.year_level}
 - الساعات المعتمدة: ${doc.credits}
 - الوصف: ${doc.description_ar || doc.description || 'غير متوفر'}
-`;
-  }).join('\n');
+`).join('\n');
 }
 
 // Query expansion for better search
 function expandQuery(query: string): string[] {
   const expansions: string[] = [query];
   
-  // Add Arabic/English variations
   const courseKeywords: Record<string, string[]> = {
     'برمجة': ['programming', 'بايثون', 'جافا', 'coding'],
     'قواعد بيانات': ['database', 'sql', 'db'],
-    'شبكات': ['networks', 'networking', 'network'],
+    'شبكات': ['networks', 'networking'],
     'ذكاء اصطناعي': ['ai', 'artificial intelligence', 'machine learning'],
     'رياضيات': ['math', 'mathematics', 'calculus'],
     'فيزياء': ['physics'],
@@ -101,43 +145,54 @@ function expandQuery(query: string): string[] {
     }
   }
   
-  return expansions;
+  return [...new Set(expansions)];
 }
 
+// =============================================================================
+// MAIN HANDLER
+// =============================================================================
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { 
-      query, 
-      conversation_id,
-      filters,
-      use_hybrid_search = true,
-      top_k = 5,
-      student_context
-    } = await req.json();
+    // Parse and validate request
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return createErrorResponse('VALIDATION_ERR_001', 'Invalid JSON', 'JSON غير صالح', 400);
+    }
+    
+    const parseResult = RequestSchema.safeParse(body);
+    if (!parseResult.success) {
+      const errors = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+      console.error("Validation errors:", errors);
+      return createErrorResponse('VALIDATION_ERR_001', `Validation failed: ${errors.join(', ')}`, 'فشل التحقق من البيانات', 400);
+    }
+    
+    const { query, filters, use_hybrid_search, top_k, student_context } = parseResult.data;
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      return createErrorResponse('CONFIG_ERR_001', 'AI service not configured', 'خدمة الذكاء الاصطناعي غير مكونة', 500);
     }
 
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
     
-    console.log("Processing RAG query:", query);
+    console.log("Processing RAG query:", query.slice(0, 100));
     
     // Expand query for better search
     const expandedQueries = use_hybrid_search ? expandQuery(query) : [query];
     
     // Search for relevant documents
     const allDocuments: any[] = [];
-    for (const q of expandedQueries) {
-      const docs = await searchDocuments(q, supabase, filters);
+    for (const q of expandedQueries.slice(0, 5)) { // Limit expansions
+      const docs = await searchDocuments(q, supabase, filters, top_k);
       allDocuments.push(...docs);
     }
     
@@ -154,9 +209,9 @@ serve(async (req) => {
     if (student_context) {
       studentInfo = `
 معلومات الطالب:
-- القسم: ${student_context.department || 'غير محدد'}
-- السنة: ${student_context.year_level || 'غير محدد'}
-- المعدل: ${student_context.gpa || 'غير محدد'}
+- القسم: ${student_context.department ?? 'غير محدد'}
+- السنة: ${student_context.year_level ?? 'غير محدد'}
+- المعدل: ${student_context.gpa ?? 'غير محدد'}
 `;
     }
     
@@ -185,48 +240,25 @@ serve(async (req) => {
       console.error("AI gateway error:", response.status, errorText);
       
       if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "تم تجاوز الحد المسموح من الطلبات" }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return createErrorResponse('RATE_ERR_001', 'Rate limit exceeded', 'تم تجاوز الحد المسموح من الطلبات', 429);
       }
       
       if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "يرجى إضافة رصيد للذكاء الاصطناعي" }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return createErrorResponse('PAYMENT_ERR_001', 'Payment required', 'يرجى إضافة رصيد', 402);
       }
       
-      throw new Error(`AI gateway error: ${response.status}`);
+      return createErrorResponse('AI_ERR_001', 'AI service error', 'خطأ في خدمة الذكاء الاصطناعي', 502);
     }
 
-    // Transform stream to include sources
+    // Transform stream to include sources at end
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
-    let fullContent = "";
     
     const transformStream = new TransformStream({
       transform(chunk, controller) {
-        const text = decoder.decode(chunk);
         controller.enqueue(chunk);
-        
-        // Track content for saving
-        const lines = text.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.choices?.[0]?.delta?.content) {
-                fullContent += data.choices[0].delta.content;
-              }
-            } catch (e) {
-              // Ignore parse errors
-            }
-          }
-        }
       },
-      async flush(controller) {
+      flush(controller) {
         // Send sources at the end
         const sourcesEvent = {
           type: 'sources',
@@ -234,7 +266,7 @@ serve(async (req) => {
             code: doc.code,
             name: doc.name_ar || doc.name,
             department: doc.department,
-            score: 0.9 // Placeholder score
+            score: 0.9
           }))
         };
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(sourcesEvent)}\n\n`));
@@ -246,9 +278,11 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("RAG query error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    return createErrorResponse(
+      'UNKNOWN_ERR_001',
+      error instanceof Error ? error.message : 'Unknown error',
+      'حدث خطأ غير متوقع',
+      500
     );
   }
 });
