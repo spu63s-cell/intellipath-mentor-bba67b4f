@@ -1,12 +1,82 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Agentic RAG System Prompt
+// =============================================================================
+// ERROR CODES & BILINGUAL MESSAGES
+// =============================================================================
+const ERROR_CODES = {
+  VALIDATION_ERROR: 'VALIDATION_ERR_001',
+  MISSING_API_KEY: 'CONFIG_ERR_001',
+  RATE_LIMIT_EXCEEDED: 'RATE_ERR_001',
+  PAYMENT_REQUIRED: 'PAYMENT_ERR_001',
+  AI_GATEWAY_ERROR: 'AI_ERR_001',
+  TOOL_EXECUTION_ERROR: 'TOOL_ERR_001',
+  UNKNOWN_ERROR: 'UNKNOWN_ERR_001',
+};
+
+type ErrorCode = keyof typeof ERROR_CODES;
+
+interface ErrorResponse {
+  error: {
+    code: string;
+    message: string;
+    message_ar: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+function createErrorResponse(
+  code: ErrorCode,
+  message: string,
+  message_ar: string,
+  status: number,
+  details?: Record<string, unknown>
+): Response {
+  const body: ErrorResponse = {
+    error: {
+      code: ERROR_CODES[code],
+      message,
+      message_ar,
+      ...(details && { details }),
+    },
+  };
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+}
+
+// =============================================================================
+// INPUT VALIDATION SCHEMAS
+// =============================================================================
+const MessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string().min(1).max(10000),
+});
+
+const StudentContextSchema = z.object({
+  gpa: z.number().min(0).max(4).optional(),
+  department: z.string().max(100).optional(),
+  year_level: z.number().min(1).max(6).optional(),
+  credits_completed: z.number().min(0).max(500).optional(),
+}).optional();
+
+const RequestSchema = z.object({
+  messages: z.array(MessageSchema).min(1).max(50),
+  mode: z.enum(['agentic', 'rag', 'simple']).default('agentic'),
+  student_context: StudentContextSchema,
+  conversation_id: z.string().uuid().optional(),
+});
+
+// =============================================================================
+// AGENTIC SYSTEM PROMPT
+// =============================================================================
 const AGENTIC_SYSTEM_PROMPT = `أنت "IntelliPath Agent" - نظام ذكاء اصطناعي متقدم للاستشارات الأكاديمية مع قدرات Agentic.
 
 ## قدراتك:
@@ -18,25 +88,16 @@ const AGENTIC_SYSTEM_PROMPT = `أنت "IntelliPath Agent" - نظام ذكاء ا
 - search_courses: البحث في المقررات الدراسية
 - get_prerequisites: جلب المتطلبات السابقة للمقرر
 - calculate_gpa: حساب المعدل التراكمي
-- analyze_academic_plan: تحليل الخطة الدراسية
-- get_student_progress: جلب تقدم الطالب
-- search_career_paths: البحث في المسارات المهنية
+- analyze_academic_risk: تحليل المخاطر الأكاديمية
+- suggest_courses: اقتراح المقررات
 
-## تنسيق الأفكار (للبث المباشر):
-عند التفكير، استخدم هذه التنسيقات:
+## تنسيق الأفكار:
 - [PLAN] وصف الخطة...
 - [EXECUTE] تنفيذ الخطوة...
 - [TOOL] اسم_الأداة: المعاملات...
 - [RESULT] نتيجة الأداة...
 - [REFLECT] مراجعة النتائج...
 - [ANSWER] الإجابة النهائية...
-
-## إرشادات:
-1. فكر خطوة بخطوة قبل الإجابة
-2. استخدم الأدوات عند الحاجة
-3. راجع نتائجك قبل تقديم الإجابة النهائية
-4. كن دقيقاً ومفصلاً في التحليل
-5. قدم توصيات عملية وقابلة للتطبيق
 
 ## أقسام كلية الهندسة - SPU:
 - هندسة المعلوماتية
@@ -48,7 +109,9 @@ const AGENTIC_SYSTEM_PROMPT = `أنت "IntelliPath Agent" - نظام ذكاء ا
 ## نظام الدرجات:
 A (90-100): 4.0, B+ (85-89): 3.5, B (80-84): 3.0, C+ (75-79): 2.5, C (70-74): 2.0, D+ (65-69): 1.5, D (60-64): 1.0, F (<60): 0.0`;
 
-// Tools definitions for the AI
+// =============================================================================
+// TOOLS DEFINITIONS
+// =============================================================================
 const TOOLS = [
   {
     type: "function",
@@ -96,8 +159,7 @@ const TOOLS = [
                 grade: { type: "number" },
                 credits: { type: "number" }
               }
-            },
-            description: "قائمة الدرجات مع الساعات المعتمدة"
+            }
           }
         },
         required: ["grades"]
@@ -128,9 +190,9 @@ const TOOLS = [
       parameters: {
         type: "object",
         properties: {
-          department: { type: "string", description: "القسم" },
-          completed_courses: { type: "array", items: { type: "string" }, description: "المقررات المكتملة" },
-          target_credits: { type: "number", description: "عدد الساعات المستهدفة" }
+          department: { type: "string" },
+          completed_courses: { type: "array", items: { type: "string" } },
+          target_credits: { type: "number" }
         },
         required: ["department"]
       }
@@ -138,58 +200,82 @@ const TOOLS = [
   }
 ];
 
-// Tool execution functions
-async function executeTool(toolName: string, args: any, supabase: any): Promise<any> {
-  switch (toolName) {
-    case "search_courses":
-      return await searchCourses(args, supabase);
-    case "get_prerequisites":
-      return await getPrerequisites(args, supabase);
-    case "calculate_gpa":
-      return calculateGPA(args);
-    case "analyze_academic_risk":
-      return analyzeRisk(args);
-    case "suggest_courses":
-      return await suggestCourses(args, supabase);
-    default:
-      return { error: `Unknown tool: ${toolName}` };
+// =============================================================================
+// TOOL EXECUTION FUNCTIONS
+// =============================================================================
+async function executeTool(toolName: string, args: unknown, supabase: any): Promise<unknown> {
+  console.log(`Executing tool: ${toolName}`, args);
+  
+  try {
+    switch (toolName) {
+      case "search_courses":
+        return await searchCourses(args as any, supabase);
+      case "get_prerequisites":
+        return await getPrerequisites(args as any, supabase);
+      case "calculate_gpa":
+        return calculateGPA(args as any);
+      case "analyze_academic_risk":
+        return analyzeRisk(args as any);
+      case "suggest_courses":
+        return await suggestCourses(args as any, supabase);
+      default:
+        return { error: `Unknown tool: ${toolName}`, error_ar: `أداة غير معروفة: ${toolName}` };
+    }
+  } catch (error) {
+    console.error(`Tool execution error [${toolName}]:`, error);
+    return { 
+      error: `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      error_ar: 'فشل في تنفيذ الأداة'
+    };
   }
 }
 
-async function searchCourses(args: any, supabase: any) {
+async function searchCourses(args: { query: string; department?: string; year_level?: number }, supabase: any) {
   const { query, department, year_level } = args;
+  
+  // Sanitize search input
+  const sanitizedQuery = query.trim().slice(0, 100).replace(/[%_]/g, '');
   
   let queryBuilder = supabase
     .from('courses')
-    .select('*')
-    .or(`name.ilike.%${query}%,name_ar.ilike.%${query}%,code.ilike.%${query}%`)
+    .select('code, name, name_ar, credits, year_level, department')
+    .or(`name.ilike.%${sanitizedQuery}%,name_ar.ilike.%${sanitizedQuery}%,code.ilike.%${sanitizedQuery}%`)
     .eq('is_active', true);
   
   if (department) {
-    queryBuilder = queryBuilder.eq('department', department);
+    queryBuilder = queryBuilder.eq('department', department.trim().slice(0, 50));
   }
-  if (year_level) {
+  if (year_level && year_level >= 1 && year_level <= 6) {
     queryBuilder = queryBuilder.eq('year_level', year_level);
   }
   
   const { data, error } = await queryBuilder.limit(10);
   
-  if (error) return { error: error.message };
+  if (error) {
+    console.error("Search error:", error);
+    return { error: error.message, courses: [], count: 0 };
+  }
+  
   return { courses: data || [], count: data?.length || 0 };
 }
 
-async function getPrerequisites(args: any, supabase: any) {
-  const { course_code } = args;
+async function getPrerequisites(args: { course_code: string }, supabase: any) {
+  const courseCode = args.course_code.trim().slice(0, 20).toUpperCase();
   
   const { data: course, error: courseError } = await supabase
     .from('courses')
     .select('id, code, name, name_ar, credits, year_level')
-    .eq('code', course_code)
+    .eq('code', courseCode)
     .single();
   
-  if (courseError) return { error: `Course not found: ${course_code}` };
+  if (courseError) {
+    return { 
+      error: `Course not found: ${courseCode}`, 
+      error_ar: `المقرر غير موجود: ${courseCode}` 
+    };
+  }
   
-  const { data: prerequisites, error: prereqError } = await supabase
+  const { data: prerequisites } = await supabase
     .from('course_prerequisites')
     .select(`
       prerequisite:courses!course_prerequisites_prerequisite_id_fkey(
@@ -204,18 +290,21 @@ async function getPrerequisites(args: any, supabase: any) {
   };
 }
 
-function calculateGPA(args: any) {
+function calculateGPA(args: { grades: Array<{ grade: number; credits: number }> }) {
   const { grades } = args;
   
   if (!grades || grades.length === 0) {
-    return { error: "No grades provided" };
+    return { error: "No grades provided", error_ar: "لم يتم تقديم أي درجات" };
   }
   
   let totalPoints = 0;
   let totalCredits = 0;
   
   for (const g of grades) {
-    const gradePoint = convertToGradePoint(g.grade);
+    if (typeof g.grade !== 'number' || typeof g.credits !== 'number') continue;
+    if (g.credits < 0 || g.credits > 10) continue;
+    
+    const gradePoint = convertToGradePoint(Math.min(100, Math.max(0, g.grade)));
     totalPoints += gradePoint * g.credits;
     totalCredits += g.credits;
   }
@@ -252,66 +341,72 @@ function getLetterGrade(gpa: number): string {
   return "F";
 }
 
-function analyzeRisk(args: any) {
-  const { gpa, credits_completed = 0, year_level = 1 } = args;
+function analyzeRisk(args: { gpa: number; credits_completed?: number; year_level?: number }) {
+  const gpa = Math.min(4, Math.max(0, args.gpa || 0));
+  const credits_completed = Math.min(500, Math.max(0, args.credits_completed || 0));
+  const year_level = Math.min(6, Math.max(1, args.year_level || 1));
   
   let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
   let riskScore = 0;
-  const factors: string[] = [];
-  const recommendations: string[] = [];
+  const factors: Array<{ name: string; name_en: string; weight: number }> = [];
+  const recommendations: Array<{ ar: string; en: string }> = [];
   
   // GPA-based risk
   if (gpa < 2.0) {
     riskLevel = 'critical';
     riskScore += 40;
-    factors.push('المعدل أقل من 2.0 (إنذار أكاديمي)');
-    recommendations.push('التواصل مع المرشد الأكاديمي فوراً');
+    factors.push({ name: 'المعدل أقل من 2.0 (إنذار أكاديمي)', name_en: 'GPA below 2.0 (Academic Warning)', weight: 40 });
+    recommendations.push({ ar: 'التواصل مع المرشد الأكاديمي فوراً', en: 'Contact academic advisor immediately' });
   } else if (gpa < 2.5) {
     riskLevel = 'high';
     riskScore += 25;
-    factors.push('المعدل منخفض (أقل من 2.5)');
-    recommendations.push('تقليل عدد الساعات في الفصل القادم');
+    factors.push({ name: 'المعدل منخفض (أقل من 2.5)', name_en: 'Low GPA (below 2.5)', weight: 25 });
+    recommendations.push({ ar: 'تقليل عدد الساعات في الفصل القادم', en: 'Reduce credit hours next semester' });
   } else if (gpa < 3.0) {
     riskLevel = 'medium';
     riskScore += 15;
-    factors.push('المعدل متوسط');
-    recommendations.push('التركيز على تحسين الأداء في المقررات الصعبة');
+    factors.push({ name: 'المعدل متوسط', name_en: 'Average GPA', weight: 15 });
+    recommendations.push({ ar: 'التركيز على تحسين الأداء', en: 'Focus on improving performance' });
   }
   
   // Credits progress
   const expectedCredits = year_level * 30;
   if (credits_completed < expectedCredits * 0.7) {
     riskScore += 15;
-    factors.push('تأخر في الساعات المعتمدة');
-    recommendations.push('التسجيل في ساعات إضافية إن أمكن');
+    factors.push({ name: 'تأخر في الساعات المعتمدة', name_en: 'Behind on credit hours', weight: 15 });
+    recommendations.push({ ar: 'التسجيل في ساعات إضافية إن أمكن', en: 'Register for additional credits if possible' });
   }
   
   return {
     riskLevel,
-    riskScore,
+    riskScore: Math.min(100, riskScore),
     factors,
-    recommendations,
-    predictedGPA: gpa // Simplified prediction
+    recommendations: recommendations.map(r => r.ar),
+    recommendations_en: recommendations.map(r => r.en),
+    predictedGpa: gpa
   };
 }
 
-async function suggestCourses(args: any, supabase: any) {
-  const { department, completed_courses = [], target_credits = 15 } = args;
+async function suggestCourses(args: { department: string; completed_courses?: string[]; target_credits?: number }, supabase: any) {
+  const department = args.department.trim().slice(0, 50);
+  const completed_courses = (args.completed_courses || []).slice(0, 50);
+  const target_credits = Math.min(24, Math.max(3, args.target_credits || 15));
   
   const { data: courses, error } = await supabase
     .from('courses')
-    .select('*')
+    .select('code, name, name_ar, credits, year_level')
     .eq('department', department)
     .eq('is_active', true)
     .order('year_level', { ascending: true })
     .limit(20);
   
-  if (error) return { error: error.message };
+  if (error) {
+    return { error: error.message, suggestedCourses: [] };
+  }
   
-  // Filter out completed courses
-  const available = courses?.filter((c: any) => !completed_courses.includes(c.code)) || [];
+  const completedSet = new Set(completed_courses.map(c => c.toUpperCase()));
+  const available = (courses || []).filter((c: any) => !completedSet.has(c.code.toUpperCase()));
   
-  // Select courses up to target credits
   let totalCredits = 0;
   const suggested: any[] = [];
   
@@ -329,38 +424,69 @@ async function suggestCourses(args: any, supabase: any) {
   };
 }
 
+// =============================================================================
+// MAIN HANDLER
+// =============================================================================
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { messages, mode = 'agentic', student_context } = await req.json();
+    // Parse and validate request
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return createErrorResponse(
+        'VALIDATION_ERROR',
+        'Invalid JSON in request body',
+        'JSON غير صالح في جسم الطلب',
+        400
+      );
+    }
+    
+    const parseResult = RequestSchema.safeParse(body);
+    if (!parseResult.success) {
+      const errors = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+      console.error("Validation errors:", errors);
+      return createErrorResponse(
+        'VALIDATION_ERROR',
+        `Validation failed: ${errors.join(', ')}`,
+        'فشل التحقق من البيانات المدخلة',
+        400,
+        { errors }
+      );
+    }
+    
+    const { messages, mode, student_context } = parseResult.data;
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      return createErrorResponse(
+        'MISSING_API_KEY',
+        'AI service is not configured',
+        'خدمة الذكاء الاصطناعي غير مكونة',
+        500
+      );
     }
 
-    // Create Supabase client for tool execution
-    const supabase = createClient(
-      SUPABASE_URL!,
-      SUPABASE_SERVICE_ROLE_KEY!
-    );
+    const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
     console.log(`Processing ${mode} chat request with ${messages.length} messages`);
 
-    // Build context from student data if available
+    // Build context from student data
     let contextMessage = "";
     if (student_context) {
       contextMessage = `
 معلومات الطالب الحالي:
-- المعدل التراكمي: ${student_context.gpa || 'غير محدد'}
-- القسم: ${student_context.department || 'غير محدد'}
-- السنة الدراسية: ${student_context.year_level || 'غير محدد'}
-- الساعات المكتملة: ${student_context.credits_completed || 'غير محدد'}
+- المعدل التراكمي: ${student_context.gpa ?? 'غير محدد'}
+- القسم: ${student_context.department ?? 'غير محدد'}
+- السنة الدراسية: ${student_context.year_level ?? 'غير محدد'}
+- الساعات المكتملة: ${student_context.credits_completed ?? 'غير محدد'}
 `;
     }
 
@@ -389,20 +515,29 @@ serve(async (req) => {
         console.error("AI gateway error:", response.status, errorText);
         
         if (response.status === 429) {
-          return new Response(
-            JSON.stringify({ error: "تم تجاوز الحد المسموح من الطلبات" }),
-            { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          return createErrorResponse(
+            'RATE_LIMIT_EXCEEDED',
+            'Too many requests. Please try again later.',
+            'تم تجاوز الحد المسموح من الطلبات. يرجى المحاولة لاحقاً',
+            429
           );
         }
         
         if (response.status === 402) {
-          return new Response(
-            JSON.stringify({ error: "يرجى إضافة رصيد للذكاء الاصطناعي" }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          return createErrorResponse(
+            'PAYMENT_REQUIRED',
+            'Please add credits to use AI features.',
+            'يرجى إضافة رصيد لاستخدام الذكاء الاصطناعي',
+            402
           );
         }
         
-        throw new Error(`AI gateway error: ${response.status}`);
+        return createErrorResponse(
+          'AI_GATEWAY_ERROR',
+          `AI service error: ${response.status}`,
+          'حدث خطأ في خدمة الذكاء الاصطناعي',
+          502
+        );
       }
 
       // Stream the response with tool call handling
@@ -428,7 +563,6 @@ serve(async (req) => {
                         const args = JSON.parse(toolCall.function.arguments);
                         const result = await executeTool(toolCall.function.name, args, supabase);
                         
-                        // Send tool execution result
                         const toolEvent = {
                           type: 'tool_result',
                           tool: toolCall.function.name,
@@ -446,8 +580,7 @@ serve(async (req) => {
                 if (delta?.content) {
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: delta.content })}\n\n`));
                 }
-              } catch (e) {
-                // Forward raw line
+              } catch {
                 controller.enqueue(encoder.encode(line + '\n'));
               }
             } else {
@@ -462,7 +595,7 @@ serve(async (req) => {
       });
     }
 
-    // Standard RAG mode
+    // Standard RAG/Simple mode
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -480,9 +613,13 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      console.error("AI gateway error:", response.status);
+      return createErrorResponse(
+        'AI_GATEWAY_ERROR',
+        `AI service error: ${response.status}`,
+        'حدث خطأ في خدمة الذكاء الاصطناعي',
+        502
+      );
     }
 
     return new Response(response.body, {
@@ -490,9 +627,11 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Agentic chat error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    return createErrorResponse(
+      'UNKNOWN_ERROR',
+      error instanceof Error ? error.message : 'An unexpected error occurred',
+      'حدث خطأ غير متوقع',
+      500
     );
   }
 });
