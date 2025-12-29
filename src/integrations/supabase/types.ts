@@ -91,6 +91,51 @@ export type Database = {
           },
         ]
       }
+      chat_analytics: {
+        Row: {
+          cache_hit: boolean | null
+          confidence: number | null
+          conversation_id: string | null
+          created_at: string
+          faq_match: boolean | null
+          id: string
+          latency_ms: number | null
+          query_text: string
+          response_mode: string
+          route_type: string | null
+          sources_count: number | null
+          user_id: string | null
+        }
+        Insert: {
+          cache_hit?: boolean | null
+          confidence?: number | null
+          conversation_id?: string | null
+          created_at?: string
+          faq_match?: boolean | null
+          id?: string
+          latency_ms?: number | null
+          query_text: string
+          response_mode?: string
+          route_type?: string | null
+          sources_count?: number | null
+          user_id?: string | null
+        }
+        Update: {
+          cache_hit?: boolean | null
+          confidence?: number | null
+          conversation_id?: string | null
+          created_at?: string
+          faq_match?: boolean | null
+          id?: string
+          latency_ms?: number | null
+          query_text?: string
+          response_mode?: string
+          route_type?: string | null
+          sources_count?: number | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       chat_conversations: {
         Row: {
           created_at: string
@@ -342,6 +387,57 @@ export type Database = {
           },
         ]
       }
+      faqs: {
+        Row: {
+          answer: string
+          answer_ar: string | null
+          category: string
+          created_at: string
+          department: string | null
+          hit_count: number | null
+          id: string
+          is_active: boolean | null
+          keywords: string[] | null
+          priority: number | null
+          question: string
+          question_ar: string | null
+          updated_at: string
+          year_level: number | null
+        }
+        Insert: {
+          answer: string
+          answer_ar?: string | null
+          category?: string
+          created_at?: string
+          department?: string | null
+          hit_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          keywords?: string[] | null
+          priority?: number | null
+          question: string
+          question_ar?: string | null
+          updated_at?: string
+          year_level?: number | null
+        }
+        Update: {
+          answer?: string
+          answer_ar?: string | null
+          category?: string
+          created_at?: string
+          department?: string | null
+          hit_count?: number | null
+          id?: string
+          is_active?: boolean | null
+          keywords?: string[] | null
+          priority?: number | null
+          question?: string
+          question_ar?: string | null
+          updated_at?: string
+          year_level?: number | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -447,6 +543,66 @@ export type Database = {
         }
         Relationships: []
       }
+      query_cache: {
+        Row: {
+          created_at: string
+          expires_at: string
+          hit_count: number | null
+          id: string
+          metadata_filter: Json | null
+          query_hash: string
+          query_text: string
+          response: Json
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          hit_count?: number | null
+          id?: string
+          metadata_filter?: Json | null
+          query_hash: string
+          query_text: string
+          response: Json
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          hit_count?: number | null
+          id?: string
+          metadata_filter?: Json | null
+          query_hash?: string
+          query_text?: string
+          response?: Json
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          request_count: number | null
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          request_count?: number | null
+          user_id: string
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          request_count?: number | null
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       student_achievements: {
         Row: {
           achievement_id: string
@@ -528,6 +684,119 @@ export type Database = {
           user_id?: string
           xp_points?: number | null
           year_level?: number
+        }
+        Relationships: []
+      }
+      study_materials: {
+        Row: {
+          content_chunks: Json | null
+          content_text: string | null
+          course_id: string | null
+          created_at: string
+          description: string | null
+          download_count: number | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string
+          id: string
+          is_processed: boolean | null
+          is_public: boolean | null
+          metadata: Json | null
+          title: string
+          title_ar: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_chunks?: Json | null
+          content_text?: string | null
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          download_count?: number | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type: string
+          id?: string
+          is_processed?: boolean | null
+          is_public?: boolean | null
+          metadata?: Json | null
+          title: string
+          title_ar?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_chunks?: Json | null
+          content_text?: string | null
+          course_id?: string | null
+          created_at?: string
+          description?: string | null
+          download_count?: number | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string
+          id?: string
+          is_processed?: boolean | null
+          is_public?: boolean | null
+          metadata?: Json | null
+          title?: string
+          title_ar?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_materials_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_memories: {
+        Row: {
+          access_count: number | null
+          content: Json | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          importance: number | null
+          last_accessed_at: string | null
+          memory_type: string
+          summary: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_count?: number | null
+          content?: Json | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          importance?: number | null
+          last_accessed_at?: string | null
+          memory_type: string
+          summary: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_count?: number | null
+          content?: Json | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          importance?: number | null
+          last_accessed_at?: string | null
+          memory_type?: string
+          summary?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
