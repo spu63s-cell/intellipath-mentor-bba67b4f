@@ -14,3 +14,9 @@ export { useAcademicAnalysis } from './useAcademicAnalysis';
 // URAG System Hooks
 export { useURAGChat } from './useURAGChat';
 export { useStudyMaterials } from './useStudyMaterials';
+
+// Database Service Hooks (Qdrant, Neo4j, Redis simulation)
+export { useVectorSearch } from './useVectorSearch';
+export { useGraphQuery } from './useGraphQuery';
+export { useCacheService } from './useCacheService';
+export { useMemoryService } from './useMemoryService';
