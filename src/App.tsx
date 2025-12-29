@@ -32,6 +32,7 @@ import PeerMatching from '@/pages/PeerMatching';
 import WellnessCheck from '@/pages/WellnessCheck';
 import GpaCalculator from '@/pages/GpaCalculator';
 import Analytics from '@/pages/Analytics';
+import StudyMaterials from '@/pages/StudyMaterials';
 
 const queryClient = new QueryClient();
 
@@ -75,6 +76,7 @@ function AppContent() {
       <Route path="/wellness" element={<ProtectedRoute><WellnessCheck /></ProtectedRoute>} />
       <Route path="/gpa-calculator" element={<ProtectedRoute><GpaCalculator /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+      <Route path="/study-materials" element={<ProtectedRoute><StudyMaterials /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

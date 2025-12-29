@@ -12,6 +12,7 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatSidebar } from '@/components/chat/ChatSidebar';
 import { SuggestedQuestions } from '@/components/chat/SuggestedQuestions';
 import { useAgenticChat } from '@/hooks/api/useAgenticChat';
+import { useURAGChat } from '@/hooks/api/useURAGChat';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';

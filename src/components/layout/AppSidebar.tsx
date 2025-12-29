@@ -129,6 +129,12 @@ const studentNavItems = [
     icon: Mail,
     url: '/messages',
   },
+  {
+    titleAr: 'المواد الدراسية',
+    titleEn: 'Study Materials',
+    icon: BookOpen,
+    url: '/study-materials',
+  },
 ];
 
 const advisorNavItems = [

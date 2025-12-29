@@ -10,3 +10,7 @@ export { useIntelliPathGamification } from './useIntelliPathGamification';
 // Lovable Cloud Hooks (using Supabase Edge Functions)
 export { useAgenticChat } from './useAgenticChat';
 export { useAcademicAnalysis } from './useAcademicAnalysis';
+
+// URAG System Hooks
+export { useURAGChat } from './useURAGChat';
+export { useStudyMaterials } from './useStudyMaterials';
