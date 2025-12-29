@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PanelLeftClose, PanelLeft, Sparkles, Brain, Zap, BookOpen, Calculator, Route, StopCircle } from 'lucide-react';
+import { PanelLeftClose, PanelLeft, Sparkles, Brain, Zap, BookOpen, Calculator, Route, StopCircle, Database, Search, MemoryStick } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,9 @@ import { ChatInput } from '@/components/chat/ChatInput';
 import { ChatSidebar } from '@/components/chat/ChatSidebar';
 import { SuggestedQuestions } from '@/components/chat/SuggestedQuestions';
 import { useAgenticChat } from '@/hooks/api/useAgenticChat';
-import { useURAGChat } from '@/hooks/api/useURAGChat';
+import { useVectorSearch } from '@/hooks/api/useVectorSearch';
+import { useMemoryService } from '@/hooks/api/useMemoryService';
+import { useCacheService } from '@/hooks/api/useCacheService';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -54,7 +56,11 @@ function ParticleBackground() {
 }
 
 // AI Status and Thought indicator
-function AIStatusIndicator({ isThinking, thought }: { isThinking: boolean; thought?: string }) {
+function AIStatusIndicator({ isThinking, thought, activeServices }: { 
+  isThinking: boolean; 
+  thought?: string;
+  activeServices?: string[];
+}) {
   const { t } = useTranslation();
   
   return (
@@ -75,6 +81,15 @@ function AIStatusIndicator({ isThinking, thought }: { isThinking: boolean; thoug
       <span className={isThinking ? 'text-secondary' : 'text-emerald-500'}>
         {thought || (isThinking ? t('chat.thinking') : t('chat.connected'))}
       </span>
+      {activeServices && activeServices.length > 0 && (
+        <div className="flex gap-1">
+          {activeServices.map((service, i) => (
+            <Badge key={i} variant="outline" className="text-[10px] h-4 px-1">
+              {service}
+            </Badge>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -90,6 +105,9 @@ function ToolResultsPanel({ tools }: { tools: { name: string; result: any }[] })
       case 'search_courses': return <BookOpen className="h-3.5 w-3.5" />;
       case 'calculate_gpa': return <Calculator className="h-3.5 w-3.5" />;
       case 'get_prerequisites': return <Route className="h-3.5 w-3.5" />;
+      case 'vector_search': return <Search className="h-3.5 w-3.5" />;
+      case 'memory_recall': return <MemoryStick className="h-3.5 w-3.5" />;
+      case 'cache_check': return <Database className="h-3.5 w-3.5" />;
       default: return <Zap className="h-3.5 w-3.5" />;
     }
   };
@@ -100,6 +118,9 @@ function ToolResultsPanel({ tools }: { tools: { name: string; result: any }[] })
       calculate_gpa: { ar: 'حساب المعدل', en: 'GPA Calculation' },
       get_prerequisites: { ar: 'المتطلبات السابقة', en: 'Prerequisites' },
       analyze_plan: { ar: 'تحليل الخطة', en: 'Plan Analysis' },
+      vector_search: { ar: 'بحث دلالي', en: 'Semantic Search' },
+      memory_recall: { ar: 'استدعاء الذاكرة', en: 'Memory Recall' },
+      cache_check: { ar: 'التخزين المؤقت', en: 'Cache Hit' },
     };
     return labels[name]?.[isRTL ? 'ar' : 'en'] || name;
   };
@@ -150,6 +171,49 @@ function SourcesPanel({ sources }: { sources?: { code: string; name: string; dep
   );
 }
 
+// Services Status Panel
+function ServicesStatusPanel({ 
+  cacheHit, 
+  memoryCount, 
+  vectorResults 
+}: { 
+  cacheHit?: boolean; 
+  memoryCount?: number; 
+  vectorResults?: number;
+}) {
+  const { language } = useLanguageStore();
+  const isRTL = language === 'ar';
+
+  if (!cacheHit && !memoryCount && !vectorResults) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-wrap gap-2 px-4 py-1.5 bg-muted/30"
+    >
+      {cacheHit && (
+        <Badge variant="outline" className="text-[10px] h-5 gap-1 text-emerald-600 border-emerald-300">
+          <Database className="h-3 w-3" />
+          {isRTL ? 'من الذاكرة المؤقتة' : 'Cached'}
+        </Badge>
+      )}
+      {memoryCount && memoryCount > 0 && (
+        <Badge variant="outline" className="text-[10px] h-5 gap-1 text-blue-600 border-blue-300">
+          <MemoryStick className="h-3 w-3" />
+          {memoryCount} {isRTL ? 'ذكريات' : 'memories'}
+        </Badge>
+      )}
+      {vectorResults && vectorResults > 0 && (
+        <Badge variant="outline" className="text-[10px] h-5 gap-1 text-purple-600 border-purple-300">
+          <Search className="h-3 w-3" />
+          {vectorResults} {isRTL ? 'نتائج' : 'results'}
+        </Badge>
+      )}
+    </motion.div>
+  );
+}
+
 export default function Chat() {
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -163,6 +227,12 @@ export default function Chat() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [chatMode, setChatMode] = useState<'agentic' | 'rag' | 'simple'>('agentic');
+  const [activeServices, setActiveServices] = useState<string[]>([]);
+  const [serviceStatus, setServiceStatus] = useState<{
+    cacheHit?: boolean;
+    memoryCount?: number;
+    vectorResults?: number;
+  }>({});
   
   const { 
     messages, 
@@ -175,6 +245,11 @@ export default function Chat() {
     clearMessages, 
     setInitialMessages 
   } = useAgenticChat();
+
+  // Database services
+  const { search: vectorSearch, isLoading: vectorLoading } = useVectorSearch();
+  const { searchMemories, storeInteraction, getContextForQuery } = useMemoryService();
+  const { get: cacheGet, set: cacheSet, checkRateLimit } = useCacheService();
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -260,10 +335,13 @@ export default function Chat() {
     }
   };
 
-  const handleSend = async (input: string) => {
+  // Enhanced send with all services
+  const handleSend = useCallback(async (input: string) => {
     if (!user) return;
 
     let convId = currentConversationId;
+    setActiveServices([]);
+    setServiceStatus({});
 
     if (!convId) {
       const { data, error } = await supabase
@@ -287,25 +365,76 @@ export default function Chat() {
     }
 
     await saveMessage(convId, 'user', input);
-    
-    // Send to Agentic AI with mode
+
+    // Check rate limit
+    const rateLimit = await checkRateLimit(user.id, 'chat', 30, 60);
+    if (rateLimit && !rateLimit.allowed) {
+      toast({
+        variant: 'destructive',
+        title: isRTL ? 'تم تجاوز الحد' : 'Rate Limit',
+        description: isRTL ? 'الرجاء الانتظار قليلاً' : 'Please wait a moment',
+      });
+      return;
+    }
+
+    // 1. Check cache first
+    setActiveServices(prev => [...prev, 'Cache']);
+    const cached = await cacheGet(input);
+    if (cached?.hit) {
+      setServiceStatus(prev => ({ ...prev, cacheHit: true }));
+      // Use cached response
+      if (cached.value?.answer) {
+        await saveMessage(convId, 'assistant', cached.value.answer);
+        return;
+      }
+    }
+
+    // 2. Get memory context
+    setActiveServices(prev => [...prev, 'Memory']);
+    const memoryContext = await getContextForQuery(input);
+    const memories = await searchMemories(input, undefined, 3);
+    if (memories?.memories?.length) {
+      setServiceStatus(prev => ({ ...prev, memoryCount: memories.memories.length }));
+    }
+
+    // 3. Vector search for relevant documents
+    setActiveServices(prev => [...prev, 'Vector']);
+    const vectorResults = await vectorSearch(input, { top_k: 5, use_hybrid: true });
+    if (vectorResults?.results?.length) {
+      setServiceStatus(prev => ({ ...prev, vectorResults: vectorResults.results.length }));
+    }
+
+    // Send to Agentic AI
+    setActiveServices(prev => [...prev, 'AI']);
     await sendMessage(input, { 
       mode: chatMode,
       conversationId: convId,
     });
 
-    // Save assistant response after streaming completes
+    // Store interaction in memory
+    await storeInteraction(`User asked: ${input.slice(0, 100)}`, {
+      query: input,
+      mode: chatMode,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Cache the response
     setTimeout(async () => {
       const lastMessage = messages[messages.length - 1];
       if (lastMessage?.role === 'assistant' && lastMessage.content) {
         await saveMessage(convId!, 'assistant', lastMessage.content);
+        await cacheSet(input, { answer: lastMessage.content }, 600);
       }
-    }, 500);
-  };
+    }, 1000);
+  }, [user, currentConversationId, chatMode, messages, toast, t, isRTL, 
+      checkRateLimit, cacheGet, cacheSet, getContextForQuery, searchMemories, 
+      vectorSearch, sendMessage, storeInteraction, saveMessage]);
 
   const handleNewConversation = () => {
     setCurrentConversationId(null);
     clearMessages();
+    setServiceStatus({});
+    setActiveServices([]);
   };
 
   const handleDeleteConversation = async (id: string) => {
@@ -393,7 +522,11 @@ export default function Chat() {
                 </motion.div>
                 <div>
                   <h2 className="font-semibold text-foreground">{t('chat.title')}</h2>
-                  <AIStatusIndicator isThinking={isLoading} thought={currentThought} />
+                  <AIStatusIndicator 
+                    isThinking={isLoading} 
+                    thought={currentThought} 
+                    activeServices={activeServices}
+                  />
                 </div>
               </div>
             </div>
@@ -440,6 +573,9 @@ export default function Chat() {
               </motion.div>
             </div>
           </motion.div>
+
+          {/* Services Status */}
+          <ServicesStatusPanel {...serviceStatus} />
 
           {/* Tool Results */}
           <ToolResultsPanel tools={toolResults} />
