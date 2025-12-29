@@ -133,7 +133,7 @@ export default function Auth() {
 
     setIsLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: registerForm.email,
       password: registerForm.password,
       options: {
@@ -146,9 +146,8 @@ export default function Auth() {
       },
     });
 
-    setIsLoading(false);
-
     if (error) {
+      setIsLoading(false);
       if (error.message.includes('already registered')) {
         toast({
           variant: 'destructive',
@@ -164,6 +163,25 @@ export default function Auth() {
       }
       return;
     }
+
+    // Try to auto-link student if user was created
+    if (data?.user && registerForm.studentId) {
+      try {
+        await supabase.functions.invoke('link-student', {
+          body: {
+            user_id: data.user.id,
+            student_id: registerForm.studentId,
+            full_name: registerForm.fullName,
+          },
+        });
+        console.log('Student linking attempted for:', registerForm.studentId);
+      } catch (linkError) {
+        console.error('Error linking student:', linkError);
+        // Don't fail registration if linking fails
+      }
+    }
+
+    setIsLoading(false);
 
     toast({
       title: t('تم إنشاء الحساب!', 'Account Created!'),
