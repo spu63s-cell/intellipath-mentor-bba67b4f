@@ -52,3 +52,9 @@ verify_jwt = false
 
 [functions.study-materials]
 verify_jwt = true
+
+[functions.student-data-import]
+verify_jwt = true
+
+[functions.link-student]
+verify_jwt = false

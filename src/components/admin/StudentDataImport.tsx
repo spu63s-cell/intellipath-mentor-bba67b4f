@@ -61,7 +61,8 @@ export function StudentDataImport() {
 
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       const file = e.dataTransfer.files[0];
-      if (file.name.endsWith('.csv') || file.name.endsWith('.tsv')) {
+      const fileName = file.name.toLowerCase();
+      if (fileName.endsWith('.csv') || fileName.endsWith('.tsv') || fileName.endsWith('.zip')) {
         setSelectedFile(file);
       }
     }
@@ -121,10 +122,10 @@ export function StudentDataImport() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <FileSpreadsheet className="w-5 h-5 text-primary" />
-                  {t('رفع ملف CSV', 'Upload CSV File')}
+                  {t('رفع ملف CSV أو ZIP', 'Upload CSV or ZIP File')}
                 </CardTitle>
                 <CardDescription>
-                  {t('اسحب وأفلت ملف CSV أو اختر من جهازك', 'Drag and drop a CSV file or select from your device')}
+                  {t('اسحب وأفلت ملف CSV/ZIP أو اختر من جهازك', 'Drag and drop a CSV/ZIP file or select from your device')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -144,7 +145,7 @@ export function StudentDataImport() {
                   <input
                     id="csv-input"
                     type="file"
-                    accept=".csv,.tsv"
+                    accept=".csv,.tsv,.zip"
                     onChange={handleFileSelect}
                     className="hidden"
                   />
@@ -174,10 +175,10 @@ export function StudentDataImport() {
                       >
                         <Upload className="w-12 h-12 mx-auto text-muted-foreground" />
                         <p className="text-muted-foreground">
-                          {t('اسحب ملف CSV هنا أو انقر للاختيار', 'Drop CSV file here or click to select')}
+                          {t('اسحب ملف CSV أو ZIP هنا أو انقر للاختيار', 'Drop CSV or ZIP file here or click to select')}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {t('يدعم ملفات CSV و TSV', 'Supports CSV and TSV files')}
+                          {t('يدعم ملفات CSV و TSV و ZIP', 'Supports CSV, TSV, and ZIP files')}
                         </p>
                       </motion.div>
                     )}
