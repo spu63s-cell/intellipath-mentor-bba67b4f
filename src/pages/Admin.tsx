@@ -15,8 +15,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Users, BookOpen, Settings, Shield, Search, Plus, Edit, Trash2, 
   BarChart3, Activity, Database, Bell, Lock, Globe,
-  Download, RefreshCw, CheckCircle, XCircle, AlertTriangle, Send
+  Download, RefreshCw, CheckCircle, XCircle, AlertTriangle, Send, Upload
 } from 'lucide-react';
+import { StudentDataImport } from '@/components/admin/StudentDataImport';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAdminUsers, useAdminCourses, useSendNotification } from '@/hooks/useAdminData';
 import { toast } from 'sonner';
@@ -232,11 +233,20 @@ const Admin = () => {
                 <BookOpen className="w-4 h-4" />
                 {t('المقررات', 'Courses')}
               </TabsTrigger>
+              <TabsTrigger value="import" className="flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                {t('استيراد البيانات', 'Import Data')}
+              </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
                 {t('الإعدادات', 'Settings')}
               </TabsTrigger>
             </TabsList>
+
+            {/* Import Tab */}
+            <TabsContent value="import">
+              <StudentDataImport />
+            </TabsContent>
 
             {/* Users Tab */}
             <TabsContent value="users">
