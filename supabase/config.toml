@@ -25,6 +25,14 @@ double_confirm_changes = false
 enable_confirmations = false
 
 [functions.chat]
+
+[functions.vector-search]
+
+[functions.graph-query]
+
+[functions.cache-service]
+
+[functions.memory-service]
 verify_jwt = false
 
 [functions.agentic-chat]
