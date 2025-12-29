@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Network } from 'vis-network/standalone';
 import { motion } from 'framer-motion';
-import { Search, ZoomIn, ZoomOut, Maximize2, Info, BookOpen } from 'lucide-react';
+import { Search, ZoomIn, ZoomOut, Maximize2, Info, BookOpen, Route, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,109 +21,133 @@ import {
 } from '@/components/ui/dialog';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
+import { useGraphQuery } from '@/hooks/api/useGraphQuery';
+import { useToast } from '@/hooks/use-toast';
 
-// Mock course data
-const mockCourses = [
-  { id: '1', code: 'CS101', name: 'مبادئ البرمجة', nameEn: 'Programming Fundamentals', department: 'IT', year: 1, credits: 3, color: '#1E3A8A' },
-  { id: '2', code: 'CS102', name: 'هياكل البيانات', nameEn: 'Data Structures', department: 'IT', year: 2, credits: 3, color: '#1E3A8A' },
-  { id: '3', code: 'CS201', name: 'الخوارزميات', nameEn: 'Algorithms', department: 'IT', year: 2, credits: 3, color: '#1E3A8A' },
-  { id: '4', code: 'CS202', name: 'قواعد البيانات', nameEn: 'Databases', department: 'IT', year: 2, credits: 3, color: '#14B8A6' },
-  { id: '5', code: 'CS301', name: 'هندسة البرمجيات', nameEn: 'Software Engineering', department: 'IT', year: 3, credits: 3, color: '#14B8A6' },
-  { id: '6', code: 'CS302', name: 'الشبكات الحاسوبية', nameEn: 'Computer Networks', department: 'IT', year: 3, credits: 3, color: '#8B5CF6' },
-  { id: '7', code: 'CS303', name: 'أنظمة التشغيل', nameEn: 'Operating Systems', department: 'IT', year: 3, credits: 3, color: '#8B5CF6' },
-  { id: '8', code: 'CS401', name: 'الذكاء الاصطناعي', nameEn: 'Artificial Intelligence', department: 'IT', year: 4, credits: 3, color: '#F59E0B' },
-  { id: '9', code: 'CS402', name: 'تعلم الآلة', nameEn: 'Machine Learning', department: 'IT', year: 4, credits: 3, color: '#F59E0B' },
-  { id: '10', code: 'MATH101', name: 'التحليل الرياضي', nameEn: 'Calculus', department: 'Math', year: 1, credits: 4, color: '#EC4899' },
-  { id: '11', code: 'MATH201', name: 'الجبر الخطي', nameEn: 'Linear Algebra', department: 'Math', year: 2, credits: 3, color: '#EC4899' },
-  { id: '12', code: 'CS304', name: 'أمن المعلومات', nameEn: 'Information Security', department: 'IT', year: 3, credits: 3, color: '#EF4444' },
-];
-
-const mockPrerequisites = [
-  { from: '1', to: '2' },
-  { from: '2', to: '3' },
-  { from: '2', to: '4' },
-  { from: '3', to: '5' },
-  { from: '4', to: '5' },
-  { from: '1', to: '6' },
-  { from: '1', to: '7' },
-  { from: '3', to: '8' },
-  { from: '8', to: '9' },
-  { from: '11', to: '8' },
-  { from: '10', to: '11' },
-  { from: '6', to: '12' },
-];
-
-interface Course {
+interface GraphNode {
   id: string;
   code: string;
   name: string;
-  nameEn: string;
-  department: string;
-  year: number;
+  name_ar?: string;
   credits: number;
-  color: string;
+  department: string;
+  year_level: number;
 }
+
+interface GraphEdge {
+  from: string;
+  to: string;
+  type: 'REQUIRES';
+}
+
+// Color mapping for departments
+const departmentColors: Record<string, string> = {
+  'IT': '#1E3A8A',
+  'Informatics': '#1E3A8A',
+  'المعلوماتية': '#1E3A8A',
+  'Math': '#EC4899',
+  'الرياضيات': '#EC4899',
+  'Communications': '#14B8A6',
+  'الاتصالات': '#14B8A6',
+  'Civil': '#F59E0B',
+  'المدنية': '#F59E0B',
+  'Architecture': '#8B5CF6',
+  'العمارة': '#8B5CF6',
+  'default': '#6B7280',
+};
+
+// Year level colors
+const yearColors: Record<number, string> = {
+  1: '#3B82F6',
+  2: '#10B981',
+  3: '#F59E0B',
+  4: '#EF4444',
+  5: '#8B5CF6',
+};
 
 export default function KnowledgeGraph() {
   const containerRef = useRef<HTMLDivElement>(null);
   const networkRef = useRef<Network | null>(null);
-  const { t, language } = useLanguageStore();
+  const { language } = useLanguageStore();
+  const { toast } = useToast();
+  const isRTL = language === 'ar';
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [selectedCourse, setSelectedCourse] = useState<GraphNode | null>(null);
   const [showDialog, setShowDialog] = useState(false);
+  const [graphData, setGraphData] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] } | null>(null);
+  const [prerequisites, setPrerequisites] = useState<GraphNode[]>([]);
+  const [dependents, setDependents] = useState<GraphNode[]>([]);
 
+  const { getFullGraph, getPrerequisites, getDependents, isLoading, error } = useGraphQuery();
+
+  const t = (ar: string, en: string) => isRTL ? ar : en;
+
+  // Load graph data
   useEffect(() => {
-    if (!containerRef.current) return;
+    const loadGraph = async () => {
+      const result = await getFullGraph(selectedDepartment !== 'all' ? selectedDepartment : undefined);
+      if (result) {
+        setGraphData({ nodes: result.nodes, edges: result.edges });
+      }
+    };
+    loadGraph();
+  }, [selectedDepartment]);
 
-    // Filter courses
-    let filteredCourses = mockCourses;
-    if (selectedDepartment !== 'all') {
-      filteredCourses = filteredCourses.filter(c => c.department === selectedDepartment);
-    }
+  // Render network
+  useEffect(() => {
+    if (!containerRef.current || !graphData) return;
+
+    // Filter nodes
+    let filteredNodes = graphData.nodes;
     if (selectedYear !== 'all') {
-      filteredCourses = filteredCourses.filter(c => c.year === parseInt(selectedYear));
+      filteredNodes = filteredNodes.filter(c => c.year_level === parseInt(selectedYear));
     }
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filteredCourses = filteredCourses.filter(
-        c => c.name.includes(query) || c.nameEn.toLowerCase().includes(query) || c.code.toLowerCase().includes(query)
+      filteredNodes = filteredNodes.filter(
+        c => c.name?.toLowerCase().includes(query) || 
+             c.name_ar?.includes(query) || 
+             c.code?.toLowerCase().includes(query)
       );
     }
 
-    const filteredIds = new Set(filteredCourses.map(c => c.id));
+    const filteredIds = new Set(filteredNodes.map(c => c.id));
 
-    // Create nodes as plain array
-    const nodes = filteredCourses.map(course => ({
-      id: course.id,
-      label: language === 'ar' ? course.name : course.nameEn,
-      title: `${course.code}\n${language === 'ar' ? course.name : course.nameEn}`,
-      color: {
-        background: course.color,
-        border: course.color,
-        highlight: { background: course.color, border: '#fff' },
-      },
-      font: { color: '#fff', size: 12, face: 'Cairo' },
-      shape: 'box' as const,
-      borderWidth: 2,
-      borderWidthSelected: 4,
-      margin: { top: 10, right: 10, bottom: 10, left: 10 },
-      shadow: true,
-    }));
+    // Create vis-network nodes
+    const nodes = filteredNodes.map(course => {
+      const color = departmentColors[course.department] || yearColors[course.year_level] || departmentColors.default;
+      return {
+        id: course.id,
+        label: isRTL ? (course.name_ar || course.name) : course.name,
+        title: `${course.code}\n${isRTL ? (course.name_ar || course.name) : course.name}\n${course.credits} ${t('ساعات', 'credits')}`,
+        color: {
+          background: color,
+          border: color,
+          highlight: { background: color, border: '#fff' },
+        },
+        font: { color: '#fff', size: 12, face: 'Cairo, sans-serif' },
+        shape: 'box' as const,
+        borderWidth: 2,
+        borderWidthSelected: 4,
+        margin: { top: 10, right: 10, bottom: 10, left: 10 },
+        shadow: true,
+      };
+    });
 
-    // Create edges as plain array
-    const edges = mockPrerequisites
-      .filter(p => filteredIds.has(p.from) && filteredIds.has(p.to))
-      .map((prereq, i) => ({
+    // Create vis-network edges
+    const edges = graphData.edges
+      .filter(e => filteredIds.has(e.from) && filteredIds.has(e.to))
+      .map((edge, i) => ({
         id: `e${i}`,
-        from: prereq.from,
-        to: prereq.to,
+        from: edge.from,
+        to: edge.to,
         arrows: { to: { enabled: true, scaleFactor: 0.8 } },
         color: { color: '#94a3b8', highlight: '#14B8A6' },
         width: 2,
-        smooth: { enabled: true, type: 'cubicBezier', roundness: 0.5 },
+        smooth: { enabled: true, type: 'cubicBezier' as const, roundness: 0.5 },
       }));
 
     // Network options
@@ -160,12 +184,21 @@ export default function KnowledgeGraph() {
     networkRef.current = new Network(containerRef.current, { nodes, edges }, options);
 
     // Handle click
-    networkRef.current.on('click', (params) => {
+    networkRef.current.on('click', async (params) => {
       if (params.nodes.length > 0) {
         const courseId = params.nodes[0];
-        const course = mockCourses.find(c => c.id === courseId);
+        const course = graphData.nodes.find(c => c.id === courseId);
         if (course) {
           setSelectedCourse(course);
+          
+          // Load prerequisites and dependents
+          const [prereqResult, depResult] = await Promise.all([
+            getPrerequisites(course.code),
+            getDependents(course.code)
+          ]);
+          
+          setPrerequisites(prereqResult?.prerequisites || []);
+          setDependents(depResult?.dependents || []);
           setShowDialog(true);
         }
       }
@@ -174,7 +207,7 @@ export default function KnowledgeGraph() {
     return () => {
       networkRef.current?.destroy();
     };
-  }, [searchQuery, selectedDepartment, selectedYear, language]);
+  }, [graphData, searchQuery, selectedYear, isRTL]);
 
   const handleZoomIn = () => {
     const scale = networkRef.current?.getScale() || 1;
@@ -190,19 +223,10 @@ export default function KnowledgeGraph() {
     networkRef.current?.fit({ animation: true });
   };
 
-  const getPrerequisites = (courseId: string) => {
-    return mockPrerequisites
-      .filter(p => p.to === courseId)
-      .map(p => mockCourses.find(c => c.id === p.from))
-      .filter(Boolean) as Course[];
-  };
-
-  const getUnlocks = (courseId: string) => {
-    return mockPrerequisites
-      .filter(p => p.from === courseId)
-      .map(p => mockCourses.find(c => c.id === p.to))
-      .filter(Boolean) as Course[];
-  };
+  // Extract unique departments from data
+  const departments = graphData 
+    ? [...new Set(graphData.nodes.map(n => n.department))]
+    : [];
 
   return (
     <MainLayout>
@@ -211,9 +235,29 @@ export default function KnowledgeGraph() {
         <div className="border-b border-border bg-background p-4">
           <div className="mx-auto max-w-7xl">
             <div className="mb-4 flex items-center justify-between">
-              <h1 className="text-xl font-bold text-foreground md:text-2xl">
-                {t('خريطة المعرفة', 'Knowledge Graph')}
-              </h1>
+              <div className="flex items-center gap-3">
+                <motion.div
+                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-secondary to-primary text-white"
+                  animate={{
+                    boxShadow: [
+                      '0 0 10px hsl(var(--secondary) / 0.3)',
+                      '0 0 20px hsl(var(--secondary) / 0.5)',
+                      '0 0 10px hsl(var(--secondary) / 0.3)',
+                    ],
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Route className="h-5 w-5" />
+                </motion.div>
+                <div>
+                  <h1 className="text-xl font-bold text-foreground md:text-2xl">
+                    {t('خريطة المعرفة', 'Knowledge Graph')}
+                  </h1>
+                  <p className="text-sm text-muted-foreground">
+                    {t('شجرة المتطلبات المسبقة التفاعلية', 'Interactive prerequisites tree')}
+                  </p>
+                </div>
+              </div>
               <div className="flex items-center gap-2">
                 <Button variant="outline" size="icon" onClick={handleZoomIn}>
                   <ZoomIn className="h-4 w-4" />
@@ -230,12 +274,12 @@ export default function KnowledgeGraph() {
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3">
               <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground rtl:left-3 rtl:right-auto" />
+                <Search className="absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   placeholder={t('ابحث عن مقرر...', 'Search for a course...')}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pr-10 rtl:pl-10 rtl:pr-3"
+                  className="ps-10"
                 />
               </div>
               
@@ -245,8 +289,9 @@ export default function KnowledgeGraph() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{t('جميع الأقسام', 'All Departments')}</SelectItem>
-                  <SelectItem value="IT">{t('المعلوماتية', 'IT')}</SelectItem>
-                  <SelectItem value="Math">{t('الرياضيات', 'Math')}</SelectItem>
+                  {departments.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -260,6 +305,7 @@ export default function KnowledgeGraph() {
                   <SelectItem value="2">{t('السنة 2', 'Year 2')}</SelectItem>
                   <SelectItem value="3">{t('السنة 3', 'Year 3')}</SelectItem>
                   <SelectItem value="4">{t('السنة 4', 'Year 4')}</SelectItem>
+                  <SelectItem value="5">{t('السنة 5', 'Year 5')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -268,10 +314,19 @@ export default function KnowledgeGraph() {
 
         {/* Graph Container */}
         <div className="relative flex-1 bg-muted/30">
-          <div ref={containerRef} className="h-full w-full" />
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <span className="ml-2 text-muted-foreground">
+                {t('جاري تحميل الرسم البياني...', 'Loading graph...')}
+              </span>
+            </div>
+          ) : (
+            <div ref={containerRef} className="h-full w-full" />
+          )}
           
           {/* Legend */}
-          <Card className="absolute bottom-4 right-4 rtl:left-4 rtl:right-auto w-48 opacity-90">
+          <Card className="absolute bottom-4 end-4 w-48 opacity-90">
             <CardHeader className="p-3 pb-2">
               <CardTitle className="flex items-center gap-2 text-sm">
                 <Info className="h-4 w-4" />
@@ -280,27 +335,39 @@ export default function KnowledgeGraph() {
             </CardHeader>
             <CardContent className="space-y-2 p-3 pt-0">
               <div className="flex items-center gap-2 text-xs">
-                <div className="h-3 w-3 rounded bg-[#1E3A8A]" />
-                <span>{t('أساسيات', 'Fundamentals')}</span>
+                <div className="h-3 w-3 rounded bg-[#3B82F6]" />
+                <span>{t('السنة 1', 'Year 1')}</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <div className="h-3 w-3 rounded bg-[#14B8A6]" />
-                <span>{t('تطوير', 'Development')}</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs">
-                <div className="h-3 w-3 rounded bg-[#8B5CF6]" />
-                <span>{t('أنظمة', 'Systems')}</span>
+                <div className="h-3 w-3 rounded bg-[#10B981]" />
+                <span>{t('السنة 2', 'Year 2')}</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
                 <div className="h-3 w-3 rounded bg-[#F59E0B]" />
-                <span>{t('ذكاء اصطناعي', 'AI')}</span>
+                <span>{t('السنة 3', 'Year 3')}</span>
               </div>
               <div className="flex items-center gap-2 text-xs">
-                <div className="h-3 w-3 rounded bg-[#EC4899]" />
-                <span>{t('رياضيات', 'Math')}</span>
+                <div className="h-3 w-3 rounded bg-[#EF4444]" />
+                <span>{t('السنة 4', 'Year 4')}</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <div className="h-3 w-3 rounded bg-[#8B5CF6]" />
+                <span>{t('السنة 5', 'Year 5')}</span>
               </div>
             </CardContent>
           </Card>
+
+          {/* Stats */}
+          {graphData && (
+            <div className="absolute top-4 start-4 flex gap-2">
+              <Badge variant="secondary">
+                {graphData.nodes.length} {t('مقرر', 'courses')}
+              </Badge>
+              <Badge variant="outline">
+                {graphData.edges.length} {t('علاقة', 'relations')}
+              </Badge>
+            </div>
+          )}
         </div>
 
         {/* Course Detail Dialog */}
@@ -312,13 +379,13 @@ export default function KnowledgeGraph() {
                   <DialogTitle className="flex items-center gap-3">
                     <div
                       className="flex h-10 w-10 items-center justify-center rounded-lg text-white"
-                      style={{ backgroundColor: selectedCourse.color }}
+                      style={{ backgroundColor: yearColors[selectedCourse.year_level] || '#6B7280' }}
                     >
                       <BookOpen className="h-5 w-5" />
                     </div>
                     <div>
                       <p className="text-lg font-bold">
-                        {language === 'ar' ? selectedCourse.name : selectedCourse.nameEn}
+                        {isRTL ? (selectedCourse.name_ar || selectedCourse.name) : selectedCourse.name}
                       </p>
                       <p className="text-sm text-muted-foreground">{selectedCourse.code}</p>
                     </div>
@@ -328,7 +395,7 @@ export default function KnowledgeGraph() {
                 <div className="space-y-4">
                   <div className="flex flex-wrap gap-2">
                     <Badge variant="secondary">
-                      {t(`السنة ${selectedCourse.year}`, `Year ${selectedCourse.year}`)}
+                      {t(`السنة ${selectedCourse.year_level}`, `Year ${selectedCourse.year_level}`)}
                     </Badge>
                     <Badge variant="outline">
                       {selectedCourse.credits} {t('ساعات', 'credits')}
@@ -342,8 +409,8 @@ export default function KnowledgeGraph() {
                       {t('المتطلبات المسبقة', 'Prerequisites')}
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {getPrerequisites(selectedCourse.id).length > 0 ? (
-                        getPrerequisites(selectedCourse.id).map((course) => (
+                      {prerequisites.length > 0 ? (
+                        prerequisites.map((course) => (
                           <Badge key={course.id} variant="outline" className="text-xs">
                             {course.code}
                           </Badge>
@@ -356,14 +423,14 @@ export default function KnowledgeGraph() {
                     </div>
                   </div>
 
-                  {/* Unlocks */}
+                  {/* Dependents */}
                   <div>
                     <h4 className="mb-2 text-sm font-semibold text-foreground">
                       {t('يفتح المقررات', 'Unlocks Courses')}
                     </h4>
                     <div className="flex flex-wrap gap-2">
-                      {getUnlocks(selectedCourse.id).length > 0 ? (
-                        getUnlocks(selectedCourse.id).map((course) => (
+                      {dependents.length > 0 ? (
+                        dependents.map((course) => (
                           <Badge key={course.id} variant="outline" className="text-xs">
                             {course.code}
                           </Badge>
