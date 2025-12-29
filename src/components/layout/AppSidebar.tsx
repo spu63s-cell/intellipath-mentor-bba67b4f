@@ -19,6 +19,7 @@ import {
   Info,
   Heart,
   UserPlus,
+  BarChart3,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -85,6 +86,18 @@ const studentNavItems = [
     titleEn: 'Simulator',
     icon: Calculator,
     url: '/simulator',
+  },
+  {
+    titleAr: 'حاسبة المعدل',
+    titleEn: 'GPA Calculator',
+    icon: Calculator,
+    url: '/gpa-calculator',
+  },
+  {
+    titleAr: 'التحليلات',
+    titleEn: 'Analytics',
+    icon: BarChart3,
+    url: '/analytics',
   },
   {
     titleAr: 'سجل المواهب',
