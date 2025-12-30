@@ -17,6 +17,9 @@ interface GraphNode {
   credits: number;
   department: string;
   year_level: number;
+  semester?: number;
+  hours_theory?: number;
+  hours_lab?: number;
 }
 
 interface GraphEdge {
@@ -25,11 +28,18 @@ interface GraphEdge {
   type: 'REQUIRES';
 }
 
+interface Major {
+  id: string;
+  name: string;
+  name_en: string;
+}
+
 interface GraphQueryRequest {
-  operation: 'prerequisites' | 'dependents' | 'path' | 'full_graph' | 'critical_path';
+  operation: 'prerequisites' | 'dependents' | 'path' | 'full_graph' | 'critical_path' | 'major_graph' | 'majors_list';
   course_code?: string;
   target_code?: string;
   department?: string;
+  major_id?: string;
 }
 
 // Simulates Neo4j graph queries using course_prerequisites table
@@ -40,14 +50,29 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { operation, course_code, target_code, department }: GraphQueryRequest = await req.json();
+    const { operation, course_code, target_code, department, major_id }: GraphQueryRequest = await req.json();
 
-    console.log(`Graph query: ${operation}, course: ${course_code}`);
+    console.log(`Graph query: ${operation}, course: ${course_code}, major: ${major_id}`);
 
-    // Get all courses
+    // Handle majors_list operation first
+    if (operation === 'majors_list') {
+      const { data: majors, error: majorsError } = await supabase
+        .from('majors')
+        .select('id, name, name_en, description, total_credits, duration_years')
+        .order('name_en');
+
+      if (majorsError) throw majorsError;
+
+      return new Response(
+        JSON.stringify({ majors }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Get all courses - optionally filtered by major
     let coursesQuery = supabase
       .from('courses')
-      .select('id, code, name, name_ar, credits, department, year_level')
+      .select('id, code, name, name_ar, credits, department, year_level, semester, hours_theory, hours_lab')
       .eq('is_active', true);
 
     if (department) {
@@ -56,6 +81,18 @@ serve(async (req) => {
 
     const { data: courses, error: coursesError } = await coursesQuery;
     if (coursesError) throw coursesError;
+
+    // Get courses for specific major if major_id is provided
+    let majorCourseIds: Set<string> | null = null;
+    if (major_id && operation === 'major_graph') {
+      const { data: courseMajors, error: cmError } = await supabase
+        .from('course_majors')
+        .select('course_id')
+        .eq('major_id', major_id);
+
+      if (cmError) throw cmError;
+      majorCourseIds = new Set(courseMajors?.map(cm => cm.course_id) || []);
+    }
 
     // Get all prerequisites
     const { data: prerequisites, error: prereqError } = await supabase
@@ -76,6 +113,11 @@ serve(async (req) => {
 
     if (courses) {
       for (const course of courses) {
+        // If major filter is active, only include courses from that major
+        if (majorCourseIds && !majorCourseIds.has(course.id)) {
+          continue;
+        }
+
         const node: GraphNode = {
           id: course.id,
           code: course.code,
@@ -83,7 +125,10 @@ serve(async (req) => {
           name_ar: course.name_ar,
           credits: course.credits,
           department: course.department,
-          year_level: course.year_level
+          year_level: course.year_level,
+          semester: course.semester,
+          hours_theory: course.hours_theory,
+          hours_lab: course.hours_lab
         };
         courseMap.set(course.id, node);
         codeToId.set(course.code, course.id);
@@ -99,6 +144,9 @@ serve(async (req) => {
       for (const prereq of prerequisites) {
         const courseId = prereq.course_id;
         const prereqId = prereq.prerequisite_id;
+
+        // Only include edges where both nodes are in the filtered set
+        if (!courseMap.has(courseId) && !majorCourseIds) continue;
 
         if (!prerequisitesOf.has(courseId)) {
           prerequisitesOf.set(courseId, new Set());
@@ -320,29 +368,53 @@ serve(async (req) => {
         break;
       }
 
+      case 'major_graph':
       case 'full_graph': {
-        const nodes: GraphNode[] = Array.from(courseMap.values());
+        // For major_graph, we already filtered courses above
+        // Build nodes from the filtered courseMap
+        const nodes: GraphNode[] = Array.from(courseMap.values())
+          .sort((a, b) => {
+            if (a.year_level !== b.year_level) return a.year_level - b.year_level;
+            return a.code.localeCompare(b.code);
+          });
+
         const edges: GraphEdge[] = [];
+        const nodeIds = new Set(nodes.map(n => n.id));
 
         if (prerequisites) {
           for (const prereq of prerequisites) {
-            const fromCode = idToCode.get(prereq.course_id);
-            const toCode = idToCode.get(prereq.prerequisite_id);
-            if (fromCode && toCode) {
-              edges.push({
-                from: fromCode,
-                to: toCode,
-                type: 'REQUIRES'
-              });
+            // For major_graph, include edges where EITHER course is in the major
+            // This shows the full prerequisite context
+            if (operation === 'major_graph') {
+              // Include edge if the main course is in the major
+              if (!nodeIds.has(prereq.course_id)) continue;
             }
+
+            edges.push({
+              from: prereq.course_id,
+              to: prereq.prerequisite_id,
+              type: 'REQUIRES'
+            });
           }
+        }
+
+        // Get major info if major_id is provided
+        let majorInfo = null;
+        if (major_id) {
+          const { data: major } = await supabase
+            .from('majors')
+            .select('id, name, name_en, description, total_credits, duration_years')
+            .eq('id', major_id)
+            .single();
+          majorInfo = major;
         }
 
         result = {
           nodes,
           edges,
           total_nodes: nodes.length,
-          total_edges: edges.length
+          total_edges: edges.length,
+          major: majorInfo
         };
         break;
       }

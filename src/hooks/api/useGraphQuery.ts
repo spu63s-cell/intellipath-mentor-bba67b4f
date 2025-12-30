@@ -9,12 +9,24 @@ interface GraphNode {
   credits: number;
   department: string;
   year_level: number;
+  semester?: number;
+  hours_theory?: number;
+  hours_lab?: number;
 }
 
 interface GraphEdge {
   from: string;
   to: string;
   type: 'REQUIRES';
+}
+
+interface Major {
+  id: string;
+  name: string;
+  name_en: string;
+  description?: string;
+  total_credits?: number;
+  duration_years?: number;
 }
 
 interface PrerequisitesResponse {
@@ -48,6 +60,11 @@ interface FullGraphResponse {
   edges: GraphEdge[];
   total_nodes: number;
   total_edges: number;
+  major?: Major;
+}
+
+interface MajorsListResponse {
+  majors: Major[];
 }
 
 /**
@@ -81,6 +98,13 @@ export function useGraphQuery() {
       setIsLoading(false);
     }
   }, []);
+
+  /**
+   * Get list of all majors/specializations
+   */
+  const getMajorsList = useCallback(async (): Promise<MajorsListResponse | null> => {
+    return executeQuery<MajorsListResponse>('majors_list');
+  }, [executeQuery]);
 
   /**
    * Get all prerequisites for a course (recursive)
@@ -128,12 +152,23 @@ export function useGraphQuery() {
     return executeQuery<FullGraphResponse>('full_graph', { department });
   }, [executeQuery]);
 
+  /**
+   * Get graph for a specific major/specialization
+   */
+  const getMajorGraph = useCallback(async (
+    major_id: string
+  ): Promise<FullGraphResponse | null> => {
+    return executeQuery<FullGraphResponse>('major_graph', { major_id });
+  }, [executeQuery]);
+
   return {
+    getMajorsList,
     getPrerequisites,
     getDependents,
     findPath,
     getCriticalPath,
     getFullGraph,
+    getMajorGraph,
     isLoading,
     error
   };
