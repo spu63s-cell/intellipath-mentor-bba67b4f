@@ -18,6 +18,7 @@ import {
   Download, RefreshCw, CheckCircle, XCircle, AlertTriangle, Send, Upload
 } from 'lucide-react';
 import { StudentDataImport } from '@/components/admin/StudentDataImport';
+import { CourseDataImport } from '@/components/admin/CourseDataImport';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAdminUsers, useAdminCourses, useSendNotification } from '@/hooks/useAdminData';
 import { toast } from 'sonner';
@@ -233,9 +234,13 @@ const Admin = () => {
                 <BookOpen className="w-4 h-4" />
                 {t('المقررات', 'Courses')}
               </TabsTrigger>
-              <TabsTrigger value="import" className="flex items-center gap-2">
+              <TabsTrigger value="import-students" className="flex items-center gap-2">
                 <Upload className="w-4 h-4" />
-                {t('استيراد البيانات', 'Import Data')}
+                {t('استيراد الطلاب', 'Import Students')}
+              </TabsTrigger>
+              <TabsTrigger value="import-courses" className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                {t('استيراد المقررات', 'Import Courses')}
               </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
@@ -243,9 +248,14 @@ const Admin = () => {
               </TabsTrigger>
             </TabsList>
 
-            {/* Import Tab */}
-            <TabsContent value="import">
+            {/* Import Students Tab */}
+            <TabsContent value="import-students">
               <StudentDataImport />
+            </TabsContent>
+
+            {/* Import Courses Tab */}
+            <TabsContent value="import-courses">
+              <CourseDataImport />
             </TabsContent>
 
             {/* Users Tab */}
