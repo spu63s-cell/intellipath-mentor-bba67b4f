@@ -19,25 +19,161 @@ interface ParsedCourse {
   description?: string;
   description_ar?: string;
   prerequisites?: string[];
+  classification?: string;
+  theoretical_hours?: number;
+  practical_hours?: number;
+}
+
+// Parse the structured TXT format with [بطاقة مقرر] cards
+function parseStructuredPlan(content: string, fileName: string): ParsedCourse[] {
+  const courses: ParsedCourse[] = [];
+  const lines = content.split('\n');
+  
+  console.log(`Parsing structured plan file: ${fileName}, lines: ${lines.length}`);
+  
+  // Extract department from first line or filename
+  let department = 'هندسة المعلوماتية';
+  const firstLine = lines[0] || '';
+  if (firstLine.includes('هندسة البرمجيات')) {
+    department = 'هندسة البرمجيات ونظم المعلومات';
+  } else if (firstLine.includes('هندسة الشبكات')) {
+    department = 'هندسة الشبكات والنظم الموزعة';
+  } else if (firstLine.includes('هندسة الذكاء')) {
+    department = 'هندسة الذكاء الاصطناعي';
+  } else if (firstLine.includes('الأمن السيبراني')) {
+    department = 'الأمن السيبراني';
+  } else if (firstLine.includes('علوم البيانات')) {
+    department = 'علوم البيانات';
+  }
+  
+  // Track current year/level for context
+  let currentYear = 1;
+  let currentLevel = 1;
+  
+  // Find all course card blocks
+  let currentCard: Partial<ParsedCourse> | null = null;
+  let currentPrerequisites: string[] = [];
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    
+    // Check for year/level headers
+    const yearMatch = line.match(/السنة\s*(الأولى|الثانية|الثالثة|الرابعة|الخامسة)/);
+    if (yearMatch) {
+      const yearMap: Record<string, number> = {
+        'الأولى': 1, 'الثانية': 2, 'الثالثة': 3, 'الرابعة': 4, 'الخامسة': 5
+      };
+      currentYear = yearMap[yearMatch[1]] || currentYear;
+    }
+    
+    const levelMatch = line.match(/المستوى\s*(الأول|الثاني|الثالث|الرابع|الخامس|السادس|السابع|الثامن|التاسع|العاشر)/);
+    if (levelMatch) {
+      const levelMap: Record<string, number> = {
+        'الأول': 1, 'الثاني': 2, 'الثالث': 3, 'الرابع': 4, 'الخامس': 5,
+        'السادس': 6, 'السابع': 7, 'الثامن': 8, 'التاسع': 9, 'العاشر': 10
+      };
+      currentLevel = levelMap[levelMatch[1]] || currentLevel;
+    }
+    
+    // New card starts
+    if (line === '[بطاقة مقرر]') {
+      // Save previous card if exists and has a valid code
+      if (currentCard && currentCard.code && currentCard.code !== '-') {
+        currentCard.prerequisites = currentPrerequisites.length > 0 ? currentPrerequisites : undefined;
+        courses.push(currentCard as ParsedCourse);
+      }
+      currentCard = {
+        department,
+        year_level: currentYear,
+        semester: `الفصل ${currentLevel}`,
+      };
+      currentPrerequisites = [];
+      continue;
+    }
+    
+    if (!currentCard) continue;
+    
+    // Parse card fields
+    if (line.startsWith('رمز_المقرر:')) {
+      const code = line.replace('رمز_المقرر:', '').trim();
+      if (code && code !== '-') {
+        currentCard.code = code;
+      }
+    }
+    else if (line.startsWith('اسم_المقرر_عربي:')) {
+      currentCard.name_ar = line.replace('اسم_المقرر_عربي:', '').trim();
+      currentCard.name = currentCard.name_ar; // Default name to Arabic
+    }
+    else if (line.startsWith('اسم_المقرر_إنكليزي:')) {
+      const engName = line.replace('اسم_المقرر_إنكليزي:', '').trim();
+      currentCard.name = engName; // Prefer English name
+    }
+    else if (line.startsWith('عدد_الساعات_المعتمدة:')) {
+      const credits = parseInt(line.replace('عدد_الساعات_المعتمدة:', '').trim(), 10);
+      currentCard.credits = isNaN(credits) ? 3 : credits;
+    }
+    else if (line.startsWith('عدد_الساعات_الأسبوعية_نظري:')) {
+      const hours = parseInt(line.replace('عدد_الساعات_الأسبوعية_نظري:', '').trim(), 10);
+      currentCard.theoretical_hours = isNaN(hours) ? undefined : hours;
+    }
+    else if (line.startsWith('عدد_الساعات_الأسبوعية_عملي:')) {
+      const val = line.replace('عدد_الساعات_الأسبوعية_عملي:', '').trim();
+      const hours = parseInt(val, 10);
+      currentCard.practical_hours = isNaN(hours) ? 0 : hours;
+    }
+    else if (line.startsWith('المتطلب_السابق:') || line.startsWith('المتطلب_السابق_1:') || line.startsWith('المتطلب_السابق_2:')) {
+      const prereqText = line.replace(/المتطلب_السابق[_\d]*:/, '').trim();
+      // Extract course codes from text like "CIFC.1.01 (مدخل إلى الخوارزميات والبرمجة)"
+      if (prereqText && prereqText !== 'لا يوجد' && prereqText !== '-') {
+        const codeMatch = prereqText.match(/^([A-Z]{4}\.[0-9]+\.[0-9]+)/i);
+        if (codeMatch) {
+          currentPrerequisites.push(codeMatch[1]);
+        }
+      }
+    }
+    else if (line.startsWith('التصنيف:')) {
+      currentCard.classification = line.replace('التصنيف:', '').trim();
+    }
+    else if (line.startsWith('الترتيب_الزمني:')) {
+      const timing = line.replace('الترتيب_الزمني:', '').trim();
+      // Extract year and level from "السنة 1 - المستوى 1"
+      const yearNum = timing.match(/السنة\s*(\d+)/);
+      const levelNum = timing.match(/المستوى\s*(\d+)/);
+      if (yearNum) currentCard.year_level = parseInt(yearNum[1], 10);
+      if (levelNum) currentCard.semester = `الفصل ${levelNum[1]}`;
+    }
+  }
+  
+  // Don't forget the last card
+  if (currentCard && currentCard.code && currentCard.code !== '-') {
+    currentCard.prerequisites = currentPrerequisites.length > 0 ? currentPrerequisites : undefined;
+    courses.push(currentCard as ParsedCourse);
+  }
+  
+  console.log(`Extracted ${courses.length} courses from structured plan`);
+  return courses;
 }
 
 // Parse Markdown content to extract courses
 function parseMarkdownCourses(content: string, fileName: string): ParsedCourse[] {
+  // First check if it's the structured format
+  if (content.includes('[بطاقة مقرر]')) {
+    return parseStructuredPlan(content, fileName);
+  }
+  
   const courses: ParsedCourse[] = [];
   const lines = content.split('\n');
   
   console.log(`Parsing markdown file: ${fileName}, lines: ${lines.length}`);
   
   let currentCourse: Partial<ParsedCourse> | null = null;
-  let currentSection = '';
-  
-  // Try to detect department from filename or content
   let detectedDepartment = '';
+  
   const deptPatterns = [
     /هندسة\s*(المعلوماتية|البرمجيات|الحواسيب|الشبكات)/i,
     /علوم\s*(الحاسوب|الحاسب)/i,
     /نظم\s*المعلومات/i,
-    /(Computer\s*Science|Software\s*Engineering|Information\s*Technology)/i,
   ];
   
   for (const pattern of deptPatterns) {
@@ -48,94 +184,15 @@ function parseMarkdownCourses(content: string, fileName: string): ParsedCourse[]
     }
   }
   
-  // Pattern to match course codes (e.g., CS101, INF201, etc.)
-  const courseCodePattern = /^(?:[-*•]?\s*)?([A-Z]{2,4}\s*\d{3,4}[A-Z]?)\s*[-–:]\s*(.+)/i;
-  const arabicCoursePattern = /^(?:[-*•]?\s*)?(\d{3,4})\s*[-–:]\s*(.+)/;
-  const tableRowPattern = /^\|?\s*([A-Z]{2,4}\s*\d{3,4}[A-Z]?)\s*\|(.+?)\|(.+?)\|/i;
-  
-  // Pattern to match prerequisites
-  const prereqPatterns = [
-    /متطلب(?:ات)?\s*(?:سابق(?:ة)?)?[:\s]+(.*)/i,
-    /prerequisite[s]?[:\s]+(.*)/i,
-    /يتطلب[:\s]+(.*)/i,
-    /requires?[:\s]+(.*)/i,
-  ];
-  
-  // Pattern to match credits
-  const creditsPatterns = [
-    /(\d+)\s*(?:ساع(?:ة|ات)|credit[s]?|وحد(?:ة|ات))/i,
-    /(?:ساعات|credits?|وحدات?)[:\s]*(\d+)/i,
-  ];
-  
-  // Pattern to match year level
-  const yearPatterns = [
-    /(?:السنة|السن|العام|الفصل|year|level|semester)[:\s]*(?:الأول(?:ى)?|الثاني(?:ة)?|الثالث(?:ة)?|الرابع(?:ة)?|first|second|third|fourth|\d)/i,
-  ];
+  // Pattern to match course codes
+  const courseCodePattern = /^(?:[-*•]?\s*)?([A-Z]{2,4}[\.\s]?\d+[\.\s]?\d*[A-Z]?)\s*[-–:]\s*(.+)/i;
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
     if (!line) continue;
     
-    // Check for section headers
-    if (line.startsWith('#')) {
-      currentSection = line.replace(/^#+\s*/, '');
-      
-      // Try to extract year level from section
-      for (const pattern of yearPatterns) {
-        const match = currentSection.match(pattern);
-        if (match) {
-          const yearMap: Record<string, number> = {
-            'الأولى': 1, 'الأول': 1, 'first': 1, '1': 1,
-            'الثانية': 2, 'الثاني': 2, 'second': 2, '2': 2,
-            'الثالثة': 3, 'الثالث': 3, 'third': 3, '3': 3,
-            'الرابعة': 4, 'الرابع': 4, 'fourth': 4, '4': 4,
-          };
-          for (const [key, val] of Object.entries(yearMap)) {
-            if (match[0].toLowerCase().includes(key.toLowerCase())) {
-              currentCourse = currentCourse || {};
-              if (currentCourse) currentCourse.year_level = val;
-              break;
-            }
-          }
-        }
-      }
-      continue;
-    }
-    
-    // Try to match course from table row
-    const tableMatch = line.match(tableRowPattern);
-    if (tableMatch) {
-      const [, code, name, creditsOrDept] = tableMatch;
-      const credits = parseInt(creditsOrDept.match(/\d+/)?.[0] || '3', 10);
-      
-      if (currentCourse && currentCourse.code) {
-        courses.push({
-          code: currentCourse.code,
-          name: currentCourse.name || currentCourse.code,
-          name_ar: currentCourse.name_ar,
-          credits: currentCourse.credits || 3,
-          department: currentCourse.department || detectedDepartment,
-          year_level: currentCourse.year_level || 1,
-          semester: currentCourse.semester,
-          description: currentCourse.description,
-          description_ar: currentCourse.description_ar,
-          prerequisites: currentCourse.prerequisites,
-        });
-      }
-      
-      currentCourse = {
-        code: code.replace(/\s+/g, '').toUpperCase(),
-        name: name.trim(),
-        credits: credits,
-        department: detectedDepartment,
-      };
-      continue;
-    }
-    
-    // Try to match course line
     const courseMatch = line.match(courseCodePattern);
     if (courseMatch) {
-      // Save previous course if exists
       if (currentCourse && currentCourse.code) {
         courses.push({
           code: currentCourse.code,
@@ -144,10 +201,6 @@ function parseMarkdownCourses(content: string, fileName: string): ParsedCourse[]
           credits: currentCourse.credits || 3,
           department: currentCourse.department || detectedDepartment,
           year_level: currentCourse.year_level || 1,
-          semester: currentCourse.semester,
-          description: currentCourse.description,
-          description_ar: currentCourse.description_ar,
-          prerequisites: currentCourse.prerequisites,
         });
       }
       
@@ -157,104 +210,20 @@ function parseMarkdownCourses(content: string, fileName: string): ParsedCourse[]
         name: name.trim(),
         department: detectedDepartment,
       };
-      
-      // Check if name contains credits
-      for (const pattern of creditsPatterns) {
-        const creditsMatch = name.match(pattern);
-        if (creditsMatch) {
-          currentCourse.credits = parseInt(creditsMatch[1], 10);
-          break;
-        }
-      }
-      
-      // Check if it's Arabic name
-      if (/[\u0600-\u06FF]/.test(name)) {
-        currentCourse.name_ar = name.replace(/\s*\(\d+\s*ساع(?:ة|ات)\)/, '').trim();
-      }
-      
-      continue;
-    }
-    
-    // Try Arabic course pattern
-    const arabicMatch = line.match(arabicCoursePattern);
-    if (arabicMatch && /[\u0600-\u06FF]/.test(line)) {
-      if (currentCourse && currentCourse.code) {
-        courses.push({
-          code: currentCourse.code,
-          name: currentCourse.name || currentCourse.code,
-          name_ar: currentCourse.name_ar,
-          credits: currentCourse.credits || 3,
-          department: currentCourse.department || detectedDepartment,
-          year_level: currentCourse.year_level || 1,
-          semester: currentCourse.semester,
-          description: currentCourse.description,
-          description_ar: currentCourse.description_ar,
-          prerequisites: currentCourse.prerequisites,
-        });
-      }
-      
-      const [, code, name] = arabicMatch;
-      currentCourse = {
-        code: code,
-        name: name.trim(),
-        name_ar: name.trim(),
-        department: detectedDepartment,
-      };
-      continue;
-    }
-    
-    // If we have a current course, look for additional info
-    if (currentCourse) {
-      // Check for prerequisites
-      for (const pattern of prereqPatterns) {
-        const prereqMatch = line.match(pattern);
-        if (prereqMatch) {
-          const prereqText = prereqMatch[1];
-          // Extract course codes from prereq text
-          const prereqCodes = prereqText.match(/[A-Z]{2,4}\s*\d{3,4}[A-Z]?/gi);
-          if (prereqCodes) {
-            currentCourse.prerequisites = prereqCodes.map(c => c.replace(/\s+/g, '').toUpperCase());
-          }
-          break;
-        }
-      }
-      
-      // Check for credits in next line
-      for (const pattern of creditsPatterns) {
-        const creditsMatch = line.match(pattern);
-        if (creditsMatch && !currentCourse.credits) {
-          currentCourse.credits = parseInt(creditsMatch[1], 10);
-          break;
-        }
-      }
-      
-      // Check for description
-      if (line.startsWith('الوصف:') || line.toLowerCase().startsWith('description:')) {
-        currentCourse.description = line.replace(/^(?:الوصف|description)[:\s]*/i, '');
-        if (/[\u0600-\u06FF]/.test(currentCourse.description)) {
-          currentCourse.description_ar = currentCourse.description;
-        }
-      }
     }
   }
   
-  // Don't forget the last course
   if (currentCourse && currentCourse.code) {
     courses.push({
       code: currentCourse.code,
       name: currentCourse.name || currentCourse.code,
-      name_ar: currentCourse.name_ar,
       credits: currentCourse.credits || 3,
       department: currentCourse.department || detectedDepartment,
       year_level: currentCourse.year_level || 1,
-      semester: currentCourse.semester,
-      description: currentCourse.description,
-      description_ar: currentCourse.description_ar,
-      prerequisites: currentCourse.prerequisites,
     });
   }
   
-  console.log(`Extracted ${courses.length} courses from ${fileName}`);
+  console.log(`Extracted ${courses.length} courses from markdown`);
   return courses;
 }
 
@@ -270,16 +239,11 @@ function parseCSVCourses(content: string): ParsedCourse[] {
   
   const headers = lines[0].split(delimiter).map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
   
-  // Find column indices
-  const codeIdx = headers.findIndex(h => ['code', 'course_code', 'رمز', 'رمز المقرر'].includes(h));
-  const nameIdx = headers.findIndex(h => ['name', 'course_name', 'اسم', 'اسم المقرر'].includes(h));
-  const nameArIdx = headers.findIndex(h => ['name_ar', 'اسم عربي', 'الاسم بالعربي'].includes(h));
-  const creditsIdx = headers.findIndex(h => ['credits', 'ساعات', 'الساعات', 'وحدات'].includes(h));
+  const codeIdx = headers.findIndex(h => ['code', 'course_code', 'رمز', 'رمز_المقرر'].includes(h));
+  const nameIdx = headers.findIndex(h => ['name', 'course_name', 'اسم', 'اسم_المقرر'].includes(h));
+  const nameArIdx = headers.findIndex(h => ['name_ar', 'اسم_المقرر_عربي'].includes(h));
+  const creditsIdx = headers.findIndex(h => ['credits', 'ساعات', 'عدد_الساعات_المعتمدة'].includes(h));
   const deptIdx = headers.findIndex(h => ['department', 'قسم', 'القسم'].includes(h));
-  const yearIdx = headers.findIndex(h => ['year', 'year_level', 'السنة', 'المستوى'].includes(h));
-  const semesterIdx = headers.findIndex(h => ['semester', 'الفصل'].includes(h));
-  const descIdx = headers.findIndex(h => ['description', 'الوصف'].includes(h));
-  const prereqIdx = headers.findIndex(h => ['prerequisites', 'متطلبات', 'متطلب سابق'].includes(h));
   
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
@@ -289,25 +253,13 @@ function parseCSVCourses(content: string): ParsedCourse[] {
     
     if (!code && !name) continue;
     
-    const course: ParsedCourse = {
+    courses.push({
       code: code.replace(/\s+/g, '').toUpperCase() || `COURSE${i}`,
       name: name || code,
       name_ar: nameArIdx >= 0 ? values[nameArIdx] : undefined,
       credits: creditsIdx >= 0 ? parseInt(values[creditsIdx], 10) || 3 : 3,
       department: deptIdx >= 0 ? values[deptIdx] : undefined,
-      year_level: yearIdx >= 0 ? parseInt(values[yearIdx], 10) || 1 : 1,
-      semester: semesterIdx >= 0 ? values[semesterIdx] : undefined,
-      description: descIdx >= 0 ? values[descIdx] : undefined,
-    };
-    
-    if (prereqIdx >= 0 && values[prereqIdx]) {
-      const prereqCodes = values[prereqIdx].match(/[A-Z]{2,4}\s*\d{3,4}[A-Z]?/gi);
-      if (prereqCodes) {
-        course.prerequisites = prereqCodes.map(c => c.replace(/\s+/g, '').toUpperCase());
-      }
-    }
-    
-    courses.push(course);
+    });
   }
   
   return courses;
@@ -473,7 +425,6 @@ serve(async (req) => {
       if (!courseMap.has(course.code)) {
         courseMap.set(course.code, course);
       } else {
-        // Merge data
         const existing = courseMap.get(course.code)!;
         if (!existing.name_ar && course.name_ar) existing.name_ar = course.name_ar;
         if (!existing.description && course.description) existing.description = course.description;
@@ -484,9 +435,12 @@ serve(async (req) => {
     }
     const uniqueCourses = Array.from(courseMap.values());
 
+    console.log(`Total unique courses to import: ${uniqueCourses.length}`);
+
     // Import courses to database
     let successful = 0;
     let failed = 0;
+    let skipped = 0;
     const errors: any[] = [];
     const importedCodes: string[] = [];
     const prerequisiteMap: Map<string, string[]> = new Map();
@@ -502,10 +456,11 @@ serve(async (req) => {
 
         if (existing) {
           if (!overwrite) {
-            continue; // Skip existing
+            skipped++;
+            continue;
           }
           // Update existing
-          await supabase
+          const { error: updateError } = await supabase
             .from("courses")
             .update({
               name: course.name,
@@ -518,21 +473,25 @@ serve(async (req) => {
               description_ar: course.description_ar,
             })
             .eq("id", existing.id);
+          
+          if (updateError) throw updateError;
         } else {
           // Insert new
-          await supabase
+          const { error: insertError } = await supabase
             .from("courses")
             .insert({
               code: course.code,
               name: course.name,
               name_ar: course.name_ar,
               credits: course.credits,
-              department: course.department || 'هندسة المعلوماتية',
+              department: course.department || 'هندسة البرمجيات ونظم المعلومات',
               year_level: course.year_level || 1,
               semester: course.semester,
               description: course.description,
               description_ar: course.description_ar,
             });
+          
+          if (insertError) throw insertError;
         }
 
         successful++;
@@ -548,10 +507,12 @@ serve(async (req) => {
           code: course.code,
           error: err instanceof Error ? err.message : String(err),
         });
+        console.error(`Error importing ${course.code}:`, err);
       }
     }
 
     // Process prerequisites after all courses are imported
+    let prereqsAdded = 0;
     for (const [courseCode, prereqCodes] of prerequisiteMap) {
       try {
         const { data: course } = await supabase
@@ -569,7 +530,6 @@ serve(async (req) => {
               .single();
               
             if (prereq) {
-              // Check if prerequisite already exists
               const { data: existingPrereq } = await supabase
                 .from("course_prerequisites")
                 .select("id")
@@ -584,6 +544,7 @@ serve(async (req) => {
                     course_id: course.id,
                     prerequisite_id: prereq.id,
                   });
+                prereqsAdded++;
               }
             }
           }
@@ -593,7 +554,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Import complete: ${successful} successful, ${failed} failed`);
+    console.log(`Import complete: ${successful} successful, ${failed} failed, ${skipped} skipped, ${prereqsAdded} prerequisites added`);
 
     return new Response(
       JSON.stringify({
@@ -603,7 +564,9 @@ serve(async (req) => {
         total_courses: uniqueCourses.length,
         successful_imports: successful,
         failed_imports: failed,
-        imported_codes: importedCodes.slice(0, 20),
+        skipped: skipped,
+        prerequisites_added: prereqsAdded,
+        imported_codes: importedCodes.slice(0, 30),
         errors: errors.slice(0, 10),
         file_errors: fileErrors,
       }),
