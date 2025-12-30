@@ -91,6 +91,51 @@ export type Database = {
           },
         ]
       }
+      career_paths: {
+        Row: {
+          color: string | null
+          created_at: string
+          demand: string | null
+          description: string | null
+          description_ar: string | null
+          icon: string | null
+          id: string
+          name: string
+          name_ar: string | null
+          neo4j_id: number | null
+          salary_range_max: number | null
+          salary_range_min: number | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          demand?: string | null
+          description?: string | null
+          description_ar?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+          salary_range_max?: number | null
+          salary_range_min?: number | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          demand?: string | null
+          description?: string | null
+          description_ar?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+          salary_range_max?: number | null
+          salary_range_min?: number | null
+        }
+        Relationships: []
+      }
       chat_analytics: {
         Row: {
           cache_hit: boolean | null
@@ -192,6 +237,84 @@ export type Database = {
           },
         ]
       }
+      course_career_paths: {
+        Row: {
+          career_path_id: string
+          course_id: string
+          created_at: string
+          id: string
+          importance: string | null
+        }
+        Insert: {
+          career_path_id: string
+          course_id: string
+          created_at?: string
+          id?: string
+          importance?: string | null
+        }
+        Update: {
+          career_path_id?: string
+          course_id?: string
+          created_at?: string
+          id?: string
+          importance?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_career_paths_career_path_id_fkey"
+            columns: ["career_path_id"]
+            isOneToOne: false
+            referencedRelation: "career_paths"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_career_paths_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_majors: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          is_required: boolean | null
+          major_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          is_required?: boolean | null
+          major_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          is_required?: boolean | null
+          major_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_majors_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_majors_major_id_fkey"
+            columns: ["major_id"]
+            isOneToOne: false
+            referencedRelation: "majors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_prerequisites: {
         Row: {
           course_id: string
@@ -228,19 +351,176 @@ export type Database = {
           },
         ]
       }
+      course_relations: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          related_course_id: string
+          relation_type: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          related_course_id: string
+          relation_type?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          related_course_id?: string
+          relation_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_relations_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_relations_related_course_id_fkey"
+            columns: ["related_course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_skills: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          level: string | null
+          skill_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          level?: string | null
+          skill_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          level?: string | null
+          skill_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_skills_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_skills_skill_id_fkey"
+            columns: ["skill_id"]
+            isOneToOne: false
+            referencedRelation: "skills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_tools: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          tool_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          tool_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          tool_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_tools_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_tools_tool_id_fkey"
+            columns: ["tool_id"]
+            isOneToOne: false
+            referencedRelation: "tools"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      course_topics: {
+        Row: {
+          course_id: string
+          created_at: string
+          id: string
+          topic_id: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          id?: string
+          topic_id: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          id?: string
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_topics_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "course_topics_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       courses: {
         Row: {
           code: string
           created_at: string
           credits: number
+          critical_path_depth: number | null
           department: string
           description: string | null
           description_ar: string | null
           difficulty_rating: number | null
+          hours_lab: number | null
+          hours_theory: number | null
           id: string
           is_active: boolean | null
+          is_bottleneck: boolean | null
           name: string
           name_ar: string | null
+          neo4j_id: number | null
+          objectives_ar: string | null
+          objectives_en: string | null
           semester: string | null
           updated_at: string
           year_level: number
@@ -249,14 +529,21 @@ export type Database = {
           code: string
           created_at?: string
           credits?: number
+          critical_path_depth?: number | null
           department: string
           description?: string | null
           description_ar?: string | null
           difficulty_rating?: number | null
+          hours_lab?: number | null
+          hours_theory?: number | null
           id?: string
           is_active?: boolean | null
+          is_bottleneck?: boolean | null
           name: string
           name_ar?: string | null
+          neo4j_id?: number | null
+          objectives_ar?: string | null
+          objectives_en?: string | null
           semester?: string | null
           updated_at?: string
           year_level?: number
@@ -265,14 +552,21 @@ export type Database = {
           code?: string
           created_at?: string
           credits?: number
+          critical_path_depth?: number | null
           department?: string
           description?: string | null
           description_ar?: string | null
           difficulty_rating?: number | null
+          hours_lab?: number | null
+          hours_theory?: number | null
           id?: string
           is_active?: boolean | null
+          is_bottleneck?: boolean | null
           name?: string
           name_ar?: string | null
+          neo4j_id?: number | null
+          objectives_ar?: string | null
+          objectives_en?: string | null
           semester?: string | null
           updated_at?: string
           year_level?: number
@@ -435,6 +729,39 @@ export type Database = {
           question_ar?: string | null
           updated_at?: string
           year_level?: number | null
+        }
+        Relationships: []
+      }
+      majors: {
+        Row: {
+          created_at: string
+          description: string | null
+          duration_years: number | null
+          id: string
+          name: string
+          name_en: string | null
+          neo4j_id: number | null
+          total_credits: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          duration_years?: number | null
+          id?: string
+          name: string
+          name_en?: string | null
+          neo4j_id?: number | null
+          total_credits?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          duration_years?: number | null
+          id?: string
+          name?: string
+          name_en?: string | null
+          neo4j_id?: number | null
+          total_credits?: number | null
         }
         Relationships: []
       }
@@ -603,6 +930,36 @@ export type Database = {
         }
         Relationships: []
       }
+      skills: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          name_ar: string | null
+          neo4j_id: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+        }
+        Relationships: []
+      }
       student_achievements: {
         Row: {
           achievement_id: string
@@ -757,6 +1114,66 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tools: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          name_ar: string | null
+          neo4j_id: number | null
+          url: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+          url?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+          url?: string | null
+        }
+        Relationships: []
+      }
+      topics: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          name_ar: string | null
+          neo4j_id: number | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          name_ar?: string | null
+          neo4j_id?: number | null
+        }
+        Relationships: []
       }
       user_memories: {
         Row: {
