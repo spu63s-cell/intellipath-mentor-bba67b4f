@@ -204,81 +204,83 @@ async function searchCourses(args: { query?: string; major?: string; year_level?
   
   console.log("Searching courses with:", { query, major, year_level });
   
-  // Map major code to major names for searching
-  const majorMapping: Record<string, string[]> = {
-    'AI': ['الذكاء الصنعي', 'Artificial Intelligence', 'AI', 'علوم البيانات'],
-    'IS': ['هندسة البرمجيات', 'نظم المعلومات', 'Software Engineering', 'IS'],
-    'SS': ['أمن النظم', 'الشبكات', 'System Security', 'SS'],
-    'COM': ['الاتصالات', 'Communication', 'COM'],
-    'CR': ['التحكم', 'الروبوت', 'Control', 'Robotics', 'CR'],
+  // Map major code to course code prefixes
+  // كل تخصص له رموز خاصة للمقررات التخصصية + المقررات المشتركة
+  const majorCodePrefixes: Record<string, { specialization: string; shared: string[] }> = {
+    'AI': { 
+      specialization: 'CIAC', 
+      shared: ['CIFC', 'CIFE', 'CIEE', 'CIQC'] // مشروع تخرج، متطلبات كلية، مقررات اختيارية مشتركة
+    },
+    'IS': { 
+      specialization: 'CIEC', 
+      shared: ['CIFC', 'CIFE', 'CIEE'] 
+    },
+    'SS': { 
+      specialization: 'CISC', 
+      shared: ['CIFC', 'CIFE'] 
+    },
+    'COM': { 
+      specialization: 'CICC', 
+      shared: ['CIFC', 'CIFE', 'CICE'] 
+    },
+    'CR': { 
+      specialization: 'CIRC', 
+      shared: ['CIFC', 'CIFE', 'CIRE'] 
+    },
   };
-  
-  // First, get the major ID from the majors table
-  let majorId: string | null = null;
-  if (major && majorMapping[major.toUpperCase()]) {
-    const majorNames = majorMapping[major.toUpperCase()];
-    const { data: majorData } = await supabase
-      .from('majors')
-      .select('id, name, name_en')
-      .limit(10);
+
+  // If searching for a specific major
+  if (major && majorCodePrefixes[major.toUpperCase()]) {
+    const prefixes = majorCodePrefixes[major.toUpperCase()];
+    const allPrefixes = [prefixes.specialization, ...prefixes.shared];
     
-    console.log("All majors:", majorData);
+    // Build the query to get courses with matching prefixes
+    let queryBuilder = supabase
+      .from('courses')
+      .select('code, name, name_ar, credits, year_level, department, hours_theory, hours_lab')
+      .eq('is_active', true);
     
-    // Find matching major
-    if (majorData) {
-      for (const m of majorData) {
-        for (const searchTerm of majorNames) {
-          if (m.name?.includes(searchTerm) || m.name_en?.toLowerCase().includes(searchTerm.toLowerCase())) {
-            majorId = m.id;
-            console.log("Found major:", m);
-            break;
-          }
-        }
-        if (majorId) break;
-      }
+    // Filter by year level if specified
+    if (year_level && year_level >= 1 && year_level <= 5) {
+      queryBuilder = queryBuilder.eq('year_level', year_level);
     }
-  }
-  
-  // If we found a major, get courses through course_majors junction table
-  if (majorId) {
-    const { data: courseMajorData, error } = await supabase
-      .from('course_majors')
-      .select(`
-        is_required,
-        courses (
-          code, name, name_ar, credits, year_level, department, hours_theory, hours_lab
-        )
-      `)
-      .eq('major_id', majorId);
+    
+    // Filter by code prefixes
+    const orConditions = allPrefixes.map(p => `code.ilike.${p}%`).join(',');
+    queryBuilder = queryBuilder.or(orConditions);
+    
+    const { data, error } = await queryBuilder.order('code').limit(50);
     
     if (error) {
       console.error("Course search error:", error);
       return { error: error.message, courses: [], count: 0 };
     }
     
-    // Extract courses
-    let courses = (courseMajorData || [])
-      .map((cm: any) => cm.courses)
-      .filter((c: any) => c && c.code);
-    
-    // Filter by year if specified
-    if (year_level && year_level >= 1 && year_level <= 5) {
-      courses = courses.filter((c: any) => c.year_level === year_level);
-    }
-    
-    // Sort by year and code
-    courses.sort((a: any, b: any) => (a.year_level - b.year_level) || a.code.localeCompare(b.code));
+    // Sort: specialization courses first, then shared
+    const courses = (data || []).sort((a: any, b: any) => {
+      const aIsSpec = a.code.startsWith(prefixes.specialization);
+      const bIsSpec = b.code.startsWith(prefixes.specialization);
+      if (aIsSpec && !bIsSpec) return -1;
+      if (!aIsSpec && bIsSpec) return 1;
+      return a.code.localeCompare(b.code);
+    });
     
     console.log(`Found ${courses.length} courses for major ${major}, year ${year_level || 'all'}`);
     
+    // Group courses by semester (using code pattern: XXXX.9.XX = semester 9, XXXX.0.XX = semester 10)
+    const semester9 = courses.filter((c: any) => c.code.includes('.9.'));
+    const semester10 = courses.filter((c: any) => c.code.includes('.0.'));
+    
     return { 
-      courses: courses.slice(0, 25), 
+      courses,
       count: courses.length,
       major: major?.toUpperCase(),
       year_level,
+      semester_9: semester9,
+      semester_10: semester10,
       message: courses.length > 0 
-        ? `تم إيجاد ${courses.length} مقرر` 
-        : 'لم يتم إيجاد مقررات'
+        ? `تم إيجاد ${courses.length} مقرر للسنة ${year_level || 'الدراسية'} تخصص ${getMajorName(major)}` 
+        : `لم يتم إيجاد مقررات للسنة ${year_level} تخصص ${getMajorName(major)}`
     };
   }
   
@@ -309,6 +311,17 @@ async function searchCourses(args: { query?: string; major?: string; year_level?
     count: data?.length || 0,
     message: data?.length ? `تم إيجاد ${data.length} مقرر` : 'لم يتم إيجاد مقررات'
   };
+}
+
+function getMajorName(code: string): string {
+  const names: Record<string, string> = {
+    'AI': 'الذكاء الصنعي وعلوم البيانات',
+    'IS': 'هندسة البرمجيات ونظم المعلومات',
+    'SS': 'أمن النظم والشبكات الحاسوبية',
+    'COM': 'هندسة الاتصالات',
+    'CR': 'هندسة التحكم والروبوت',
+  };
+  return names[code?.toUpperCase()] || code;
 }
 
 async function getPrerequisites(args: { course_code: string }, supabase: any) {
