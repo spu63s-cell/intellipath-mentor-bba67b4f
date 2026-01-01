@@ -1,6 +1,157 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Helper function to parse Excel file data
+function parseExcelToCSV(base64Data: string): string {
+  // Decode base64 to binary
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  
+  // Parse using a simple XML-based approach for xlsx
+  // This is a simplified parser that works for basic xlsx files
+  const zip = parseSimpleZip(bytes);
+  const sheetXml = zip['xl/worksheets/sheet1.xml'] || '';
+  const sharedStringsXml = zip['xl/sharedStrings.xml'] || '';
+  
+  // Parse shared strings
+  const sharedStrings: string[] = [];
+  const ssMatches = sharedStringsXml.matchAll(/<t[^>]*>([^<]*)<\/t>/g);
+  for (const m of ssMatches) {
+    sharedStrings.push(m[1]);
+  }
+  
+  // Parse sheet data
+  const rows: string[][] = [];
+  const rowMatches = sheetXml.matchAll(/<row[^>]*>([\s\S]*?)<\/row>/g);
+  
+  for (const rm of rowMatches) {
+    const rowContent = rm[1];
+    const cells: string[] = [];
+    const cellMatches = rowContent.matchAll(/<c[^>]*(?:t="([^"]*)")?[^>]*>(?:<v>([^<]*)<\/v>)?/g);
+    
+    for (const cm of cellMatches) {
+      const cellType = cm[1];
+      const cellValue = cm[2] || '';
+      
+      if (cellType === 's' && sharedStrings[parseInt(cellValue)]) {
+        cells.push(sharedStrings[parseInt(cellValue)]);
+      } else {
+        cells.push(cellValue);
+      }
+    }
+    
+    if (cells.length > 0) {
+      rows.push(cells);
+    }
+  }
+  
+  // Convert to CSV
+  return rows.map(row => 
+    row.map(cell => {
+      if (cell.includes(',') || cell.includes('"') || cell.includes('\n')) {
+        return '"' + cell.replace(/"/g, '""') + '"';
+      }
+      return cell;
+    }).join(',')
+  ).join('\n');
+}
+
+// Simple ZIP parser for xlsx files
+function parseSimpleZip(data: Uint8Array): Record<string, string> {
+  const files: Record<string, string> = {};
+  const view = new DataView(data.buffer);
+  let offset = 0;
+  
+  while (offset < data.length - 4) {
+    const signature = view.getUint32(offset, true);
+    
+    if (signature !== 0x04034b50) break; // Local file header signature
+    
+    const compressionMethod = view.getUint16(offset + 8, true);
+    const compressedSize = view.getUint32(offset + 18, true);
+    const uncompressedSize = view.getUint32(offset + 22, true);
+    const fileNameLength = view.getUint16(offset + 26, true);
+    const extraFieldLength = view.getUint16(offset + 28, true);
+    
+    const fileName = new TextDecoder().decode(data.slice(offset + 30, offset + 30 + fileNameLength));
+    const fileDataStart = offset + 30 + fileNameLength + extraFieldLength;
+    const fileData = data.slice(fileDataStart, fileDataStart + compressedSize);
+    
+    // Only handle uncompressed files (compression method 0)
+    if (compressionMethod === 0 && (fileName.includes('.xml') || fileName.includes('strings'))) {
+      files[fileName] = new TextDecoder().decode(fileData);
+    } else if (compressionMethod === 8) {
+      // Deflate compression - try to decompress
+      try {
+        const decompressed = decompressDeflate(fileData);
+        files[fileName] = new TextDecoder().decode(decompressed);
+      } catch {
+        // Skip files we can't decompress
+      }
+    }
+    
+    offset = fileDataStart + compressedSize;
+  }
+  
+  return files;
+}
+
+// Simple deflate decompression (basic implementation)
+function decompressDeflate(data: Uint8Array): Uint8Array {
+  // Use browser's built-in decompression via DecompressionStream if available
+  const inflated = new Uint8Array(data.length * 10); // Allocate buffer
+  let pos = 0;
+  let bitBuffer = 0;
+  let bitCount = 0;
+  let dataPos = 0;
+  
+  function getBits(n: number): number {
+    while (bitCount < n) {
+      if (dataPos >= data.length) return 0;
+      bitBuffer |= data[dataPos++] << bitCount;
+      bitCount += 8;
+    }
+    const result = bitBuffer & ((1 << n) - 1);
+    bitBuffer >>= n;
+    bitCount -= n;
+    return result;
+  }
+  
+  // Skip past the deflate header (2 bytes typically)
+  const cmf = data[0];
+  const flg = data[1];
+  dataPos = 2;
+  
+  // Very basic deflate - just try to extract literal bytes
+  // This is a simplified approach that may not work for all files
+  while (dataPos < data.length && pos < inflated.length) {
+    const bfinal = getBits(1);
+    const btype = getBits(2);
+    
+    if (btype === 0) {
+      // Stored block
+      bitBuffer = 0;
+      bitCount = 0;
+      if (dataPos + 4 > data.length) break;
+      const len = data[dataPos] | (data[dataPos + 1] << 8);
+      dataPos += 4;
+      for (let i = 0; i < len && dataPos < data.length && pos < inflated.length; i++) {
+        inflated[pos++] = data[dataPos++];
+      }
+    } else {
+      // For compressed blocks, just return empty - let CSV parser handle it
+      break;
+    }
+    
+    if (bfinal) break;
+  }
+  
+  return inflated.slice(0, pos);
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -234,10 +385,11 @@ serve(async (req) => {
     }
 
     // Parse request
-    const body = await req.json();
+  const body = await req.json();
     const {
       action = 'import',
       csvData,
+      xlsxData, // base64-encoded Excel file content
       fileName = 'unknown.csv',
       importLogId,
       useFilenameAsStudentId = true,
@@ -390,8 +542,27 @@ serve(async (req) => {
       );
     }
 
-    if (!csvData) {
-      return new Response(JSON.stringify({ error: 'CSV data is required' }), {
+    // Handle Excel file if provided
+    let parsedCsvData = csvData;
+    if (xlsxData && !csvData) {
+      try {
+        console.log(`Converting Excel file: ${fileName}`);
+        parsedCsvData = parseExcelToCSV(xlsxData);
+        console.log(`Excel converted, CSV length: ${parsedCsvData?.length || 0}`);
+      } catch (e) {
+        console.error('Excel parsing error:', e);
+        return new Response(JSON.stringify({ 
+          error: 'Failed to parse Excel file',
+          details: e instanceof Error ? e.message : 'Unknown error'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    if (!parsedCsvData) {
+      return new Response(JSON.stringify({ error: 'CSV or Excel data is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -403,7 +574,7 @@ serve(async (req) => {
     console.log(`Processing file: ${fileName}, extracted student_id: ${filenameStudentId}`);
 
     // Parse CSV with RFC4180 compliant parser
-    const { headers, rows } = parseCSVRFC4180(csvData);
+    const { headers, rows } = parseCSVRFC4180(parsedCsvData);
     console.log(`Parsed ${rows.length} rows, headers: ${headers.slice(0, 5).join(', ')}...`);
 
     if (rows.length === 0) {

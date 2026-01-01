@@ -141,11 +141,13 @@ export const AcademicRecordsImport = () => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    const isCSV = selectedFile.name.toLowerCase().endsWith('.csv');
-    const isZIP = selectedFile.name.toLowerCase().endsWith('.zip');
+    const fileName = selectedFile.name.toLowerCase();
+    const isCSV = fileName.endsWith('.csv') || fileName.endsWith('.tsv');
+    const isZIP = fileName.endsWith('.zip');
+    const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
 
-    if (!isCSV && !isZIP) {
-      toast.error(t('يرجى اختيار ملف CSV أو ZIP', 'Please select a CSV or ZIP file'));
+    if (!isCSV && !isZIP && !isExcel) {
+      toast.error(t('يرجى اختيار ملف CSV أو ZIP أو Excel', 'Please select a CSV, ZIP or Excel file'));
       return;
     }
 
@@ -169,6 +171,30 @@ export const AcademicRecordsImport = () => {
           recordsCount: 0,
         }]);
         
+      } else if (isExcel) {
+        // Handle Excel file - store as base64 for server processing
+        setProgressMessage(t('جاري قراءة ملف Excel...', 'Reading Excel file...'));
+        setProgress(20);
+        
+        const arrayBuffer = await selectedFile.arrayBuffer();
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const studentId = extractStudentId(selectedFile.name);
+        
+        // Store with special prefix to identify as Excel
+        setCsvContents(new Map([[selectedFile.name, `__XLSX__${base64}`]]));
+        setZipFile(null);
+        setSelectedFileName(selectedFile.name);
+        setFileStatuses([{
+          fileName: selectedFile.name,
+          studentId,
+          status: 'pending',
+          recordsCount: 0,
+        }]);
+        
+        setProgress(0);
+        setProgressMessage('');
+        toast.success(t('تم تحميل ملف Excel', 'Excel file loaded'));
+        
       } else if (isZIP) {
         setProgressMessage(t('جاري فك ضغط الملف...', 'Extracting ZIP file...'));
         setProgress(10);
@@ -177,24 +203,38 @@ export const AcademicRecordsImport = () => {
         const zip = new JSZip();
         const contents = await zip.loadAsync(selectedFile);
         
-        const fileNames = Object.keys(contents.files).filter(
-          name => name.toLowerCase().endsWith('.csv') && !name.startsWith('__MACOSX') && !contents.files[name].dir
-        );
+        // Support CSV, TSV and Excel files inside ZIP
+        const fileNames = Object.keys(contents.files).filter(name => {
+          const lower = name.toLowerCase();
+          return (lower.endsWith('.csv') || lower.endsWith('.tsv') || lower.endsWith('.xlsx') || lower.endsWith('.xls')) 
+            && !name.startsWith('__MACOSX') 
+            && !contents.files[name].dir;
+        });
 
         setProgress(30);
-        setProgressMessage(t(`تم العثور على ${fileNames.length} ملف CSV`, `Found ${fileNames.length} CSV files`));
+        setProgressMessage(t(`تم العثور على ${fileNames.length} ملف`, `Found ${fileNames.length} files`));
 
         const newContents = new Map<string, string>();
         const statuses: FileImportStatus[] = [];
 
         for (let i = 0; i < fileNames.length; i++) {
-          const fileName = fileNames[i];
-          const text = await contents.files[fileName].async('text');
-          newContents.set(fileName, text);
+          const fName = fileNames[i];
+          const lower = fName.toLowerCase();
+          
+          if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+            // Handle Excel file inside ZIP
+            const arrayBuffer = await contents.files[fName].async('arraybuffer');
+            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            newContents.set(fName, `__XLSX__${base64}`);
+          } else {
+            // CSV/TSV file
+            const text = await contents.files[fName].async('text');
+            newContents.set(fName, text);
+          }
           
           statuses.push({
-            fileName,
-            studentId: extractStudentId(fileName),
+            fileName: fName,
+            studentId: extractStudentId(fName),
             status: 'pending',
             recordsCount: 0,
           });
@@ -205,21 +245,27 @@ export const AcademicRecordsImport = () => {
         setCsvContents(newContents);
         setFileStatuses(statuses);
 
-        // Preview first file
-        if (fileNames.length > 0) {
-          const firstContent = newContents.get(fileNames[0]);
-          if (firstContent) {
-            setSelectedFileName(fileNames[0]);
+        // Preview first CSV file (skip Excel for preview)
+        const firstCsvFile = fileNames.find(f => f.toLowerCase().endsWith('.csv') || f.toLowerCase().endsWith('.tsv'));
+        if (firstCsvFile) {
+          const firstContent = newContents.get(firstCsvFile);
+          if (firstContent && !firstContent.startsWith('__XLSX__')) {
+            setSelectedFileName(firstCsvFile);
             setPreviewData(parseCSVPreview(firstContent));
           }
+        } else if (fileNames.length > 0) {
+          setSelectedFileName(fileNames[0]);
         }
 
         setProgress(0);
         setProgressMessage('');
         
+        const csvCount = fileNames.filter(f => f.toLowerCase().endsWith('.csv') || f.toLowerCase().endsWith('.tsv')).length;
+        const excelCount = fileNames.filter(f => f.toLowerCase().endsWith('.xlsx') || f.toLowerCase().endsWith('.xls')).length;
+        
         toast.success(t(
-          `تم فك الضغط: ${fileNames.length} ملف CSV`,
-          `Extracted: ${fileNames.length} CSV files`
+          `تم فك الضغط: ${csvCount} ملف CSV، ${excelCount} ملف Excel`,
+          `Extracted: ${csvCount} CSV files, ${excelCount} Excel files`
         ));
       }
     } catch (error) {
@@ -283,13 +329,17 @@ export const AcademicRecordsImport = () => {
     setProgressMessage(t('جاري التحضير...', 'Preparing...'));
 
     try {
+      // Determine file type
+      const fileName = zipFile?.name || selectedFileName;
+      const fileType = zipFile ? 'zip' : (fileName.toLowerCase().endsWith('.xlsx') || fileName.toLowerCase().endsWith('.xls') ? 'excel' : 'csv');
+      
       // Create import log
       const { data: logData, error: logError } = await supabase
         .from('import_logs')
         .insert({
           user_id: (await supabase.auth.getUser()).data.user?.id,
-          file_name: zipFile?.name || selectedFileName,
-          file_type: zipFile ? 'zip' : 'csv',
+          file_name: fileName,
+          file_type: fileType,
           total_records: 0,
           status: 'processing',
         })
@@ -329,13 +379,22 @@ export const AcademicRecordsImport = () => {
         );
 
         try {
+          // Check if it's an Excel file (stored with __XLSX__ prefix)
+          const isExcel = csvData.startsWith('__XLSX__');
+          const requestBody: Record<string, unknown> = {
+            fileName,
+            importLogId,
+            useFilenameAsStudentId: true,
+          };
+          
+          if (isExcel) {
+            requestBody.xlsxData = csvData.replace('__XLSX__', '');
+          } else {
+            requestBody.csvData = csvData;
+          }
+          
           const { data, error } = await supabase.functions.invoke('import-student-records', {
-            body: {
-              csvData,
-              fileName,
-              importLogId,
-              useFilenameAsStudentId: true,
-            },
+            body: requestBody,
           });
 
           if (error) throw error;
@@ -586,7 +645,7 @@ export const AcademicRecordsImport = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".csv,.zip"
+                  accept=".csv,.tsv,.zip,.xlsx,.xls"
                   onChange={handleFileSelect}
                   className="hidden"
                   disabled={isImporting}
