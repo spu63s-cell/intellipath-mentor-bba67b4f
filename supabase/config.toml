@@ -67,3 +67,9 @@ verify_jwt = true
 
 [functions.cleanup-job]
 verify_jwt = true
+
+[functions.import-student-records]
+verify_jwt = true
+
+[functions.course-data-import]
+verify_jwt = true

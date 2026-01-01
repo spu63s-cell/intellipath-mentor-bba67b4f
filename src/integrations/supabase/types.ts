@@ -630,11 +630,14 @@ export type Database = {
       enrollments: {
         Row: {
           academic_year: string
+          completed_hours: number | null
           course_id: string
           created_at: string
           grade: number | null
+          grade_points: number | null
           id: string
           letter_grade: string | null
+          registered_hours: number | null
           semester: string
           status: string
           student_id: string
@@ -642,11 +645,14 @@ export type Database = {
         }
         Insert: {
           academic_year: string
+          completed_hours?: number | null
           course_id: string
           created_at?: string
           grade?: number | null
+          grade_points?: number | null
           id?: string
           letter_grade?: string | null
+          registered_hours?: number | null
           semester: string
           status?: string
           student_id: string
@@ -654,11 +660,14 @@ export type Database = {
         }
         Update: {
           academic_year?: string
+          completed_hours?: number | null
           course_id?: string
           created_at?: string
           grade?: number | null
+          grade_points?: number | null
           id?: string
           letter_grade?: string | null
+          registered_hours?: number | null
           semester?: string
           status?: string
           student_id?: string
@@ -960,6 +969,108 @@ export type Database = {
         }
         Relationships: []
       }
+      student_academic_records: {
+        Row: {
+          academic_warning: string | null
+          academic_year: string
+          baccalaureate_country: string | null
+          baccalaureate_type: string | null
+          certificate_average: number | null
+          certificate_score: number | null
+          college: string | null
+          completed_hours_semester: number | null
+          course_code: string
+          course_credits: number | null
+          course_name: string
+          created_at: string
+          cumulative_gpa_percent: number | null
+          cumulative_gpa_points: number | null
+          final_grade: number | null
+          grade_points: number | null
+          has_ministry_scholarship: boolean | null
+          id: string
+          last_registration_semester: string | null
+          letter_grade: string | null
+          major: string | null
+          permanent_status: string | null
+          previous_academic_warning: string | null
+          raw_data: Json | null
+          registered_hours_semester: number | null
+          semester: string
+          semester_status: string | null
+          student_id: string
+          study_mode: string | null
+          total_completed_hours: number | null
+          updated_at: string
+        }
+        Insert: {
+          academic_warning?: string | null
+          academic_year: string
+          baccalaureate_country?: string | null
+          baccalaureate_type?: string | null
+          certificate_average?: number | null
+          certificate_score?: number | null
+          college?: string | null
+          completed_hours_semester?: number | null
+          course_code: string
+          course_credits?: number | null
+          course_name: string
+          created_at?: string
+          cumulative_gpa_percent?: number | null
+          cumulative_gpa_points?: number | null
+          final_grade?: number | null
+          grade_points?: number | null
+          has_ministry_scholarship?: boolean | null
+          id?: string
+          last_registration_semester?: string | null
+          letter_grade?: string | null
+          major?: string | null
+          permanent_status?: string | null
+          previous_academic_warning?: string | null
+          raw_data?: Json | null
+          registered_hours_semester?: number | null
+          semester: string
+          semester_status?: string | null
+          student_id: string
+          study_mode?: string | null
+          total_completed_hours?: number | null
+          updated_at?: string
+        }
+        Update: {
+          academic_warning?: string | null
+          academic_year?: string
+          baccalaureate_country?: string | null
+          baccalaureate_type?: string | null
+          certificate_average?: number | null
+          certificate_score?: number | null
+          college?: string | null
+          completed_hours_semester?: number | null
+          course_code?: string
+          course_credits?: number | null
+          course_name?: string
+          created_at?: string
+          cumulative_gpa_percent?: number | null
+          cumulative_gpa_points?: number | null
+          final_grade?: number | null
+          grade_points?: number | null
+          has_ministry_scholarship?: boolean | null
+          id?: string
+          last_registration_semester?: string | null
+          letter_grade?: string | null
+          major?: string | null
+          permanent_status?: string | null
+          previous_academic_warning?: string | null
+          raw_data?: Json | null
+          registered_hours_semester?: number | null
+          semester?: string
+          semester_status?: string | null
+          student_id?: string
+          study_mode?: string | null
+          total_completed_hours?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       student_achievements: {
         Row: {
           achievement_id: string
@@ -998,14 +1109,23 @@ export type Database = {
       }
       students: {
         Row: {
+          academic_warning: string | null
+          baccalaureate_country: string | null
+          baccalaureate_type: string | null
+          certificate_average: number | null
+          certificate_score: number | null
           created_at: string
           department: string
           gpa: number | null
+          has_ministry_scholarship: boolean | null
           id: string
           last_activity_at: string | null
           level: number | null
+          major: string | null
+          permanent_status: string | null
           streak_days: number | null
           student_id: string
+          study_mode: string | null
           total_credits: number | null
           updated_at: string
           user_id: string
@@ -1013,14 +1133,23 @@ export type Database = {
           year_level: number
         }
         Insert: {
+          academic_warning?: string | null
+          baccalaureate_country?: string | null
+          baccalaureate_type?: string | null
+          certificate_average?: number | null
+          certificate_score?: number | null
           created_at?: string
           department: string
           gpa?: number | null
+          has_ministry_scholarship?: boolean | null
           id?: string
           last_activity_at?: string | null
           level?: number | null
+          major?: string | null
+          permanent_status?: string | null
           streak_days?: number | null
           student_id: string
+          study_mode?: string | null
           total_credits?: number | null
           updated_at?: string
           user_id: string
@@ -1028,14 +1157,23 @@ export type Database = {
           year_level?: number
         }
         Update: {
+          academic_warning?: string | null
+          baccalaureate_country?: string | null
+          baccalaureate_type?: string | null
+          certificate_average?: number | null
+          certificate_score?: number | null
           created_at?: string
           department?: string
           gpa?: number | null
+          has_ministry_scholarship?: boolean | null
           id?: string
           last_activity_at?: string | null
           level?: number | null
+          major?: string | null
+          permanent_status?: string | null
           streak_days?: number | null
           student_id?: string
+          study_mode?: string | null
           total_credits?: number | null
           updated_at?: string
           user_id?: string

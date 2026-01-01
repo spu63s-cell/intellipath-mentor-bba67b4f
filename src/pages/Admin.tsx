@@ -20,6 +20,7 @@ import {
 import { StudentDataImport } from '@/components/admin/StudentDataImport';
 import { CourseDataImport } from '@/components/admin/CourseDataImport';
 import { AdvisorAssignments } from '@/components/admin/AdvisorAssignments';
+import { StudentRecordsImport } from '@/components/admin/StudentRecordsImport';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAdminUsers, useAdminCourses, useSendNotification } from '@/hooks/useAdminData';
 import { toast } from 'sonner';
@@ -239,6 +240,10 @@ const Admin = () => {
                 <Upload className="w-4 h-4" />
                 {t('استيراد الطلاب', 'Import Students')}
               </TabsTrigger>
+              <TabsTrigger value="import-records" className="flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                {t('السجلات الأكاديمية', 'Academic Records')}
+              </TabsTrigger>
               <TabsTrigger value="import-courses" className="flex items-center gap-2">
                 <BookOpen className="w-4 h-4" />
                 {t('استيراد المقررات', 'Import Courses')}
@@ -256,6 +261,11 @@ const Admin = () => {
             {/* Import Students Tab */}
             <TabsContent value="import-students">
               <StudentDataImport />
+            </TabsContent>
+
+            {/* Import Academic Records Tab */}
+            <TabsContent value="import-records">
+              <StudentRecordsImport />
             </TabsContent>
 
             {/* Import Courses Tab */}
