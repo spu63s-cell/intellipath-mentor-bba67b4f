@@ -494,20 +494,27 @@ serve(async (req) => {
       });
     }
 
-    // Insert records in batches
+    // Upsert records in batches (uses unique index for conflict detection)
     const BATCH_SIZE = 100;
     let inserted = 0;
+    let updated = 0;
     const errors: string[] = [];
 
     for (let i = 0; i < records.length; i += BATCH_SIZE) {
       const batch = records.slice(i, i + BATCH_SIZE);
-      const { error } = await supabase.from('student_academic_records').insert(batch);
+      const { data: upsertData, error } = await supabase
+        .from('student_academic_records')
+        .upsert(batch, {
+          onConflict: 'student_id,academic_year,semester,course_code',
+          ignoreDuplicates: false,
+        })
+        .select('id');
       
       if (error) {
         console.error(`Batch error:`, error);
         errors.push(error.message);
       } else {
-        inserted += batch.length;
+        inserted += upsertData?.length || batch.length;
       }
     }
 
@@ -525,7 +532,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`File ${fileName}: inserted ${inserted}/${records.length} records`);
+    console.log(`File ${fileName}: upserted ${inserted}/${records.length} records`);
 
     return new Response(JSON.stringify({
       success: errors.length === 0 || inserted > 0,
@@ -535,6 +542,7 @@ serve(async (req) => {
       total_records: records.length,
       inserted,
       duplicates_skipped: duplicatesSkipped,
+      upsert_mode: true,
       errors: errors.length > 0 ? errors : undefined,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

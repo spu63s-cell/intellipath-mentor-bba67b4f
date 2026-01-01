@@ -32,6 +32,8 @@ interface FileImportStatus {
   studentId: string;
   status: 'pending' | 'importing' | 'success' | 'failed' | 'skipped';
   recordsCount: number;
+  parsedRows?: number;
+  duplicatesSkipped?: number;
   error?: string;
 }
 
@@ -41,6 +43,8 @@ interface ImportSummary {
   failedFiles: number;
   skippedFiles: number;
   totalRecords: number;
+  totalParsedRows: number;
+  totalDuplicatesSkipped: number;
   importLogId?: string;
 }
 
@@ -299,6 +303,8 @@ export const AcademicRecordsImport = () => {
       const importLogId = logData?.id;
       const entries = Array.from(csvContents.entries());
       let totalInserted = 0;
+      let totalParsedRows = 0;
+      let totalDuplicatesSkipped = 0;
       let successFiles = 0;
       let failedFiles = 0;
       let skippedFiles = 0;
@@ -335,7 +341,12 @@ export const AcademicRecordsImport = () => {
           if (error) throw error;
 
           const inserted = data?.inserted || 0;
+          const parsedRows = data?.parsed_rows || 0;
+          const duplicatesSkipped = data?.duplicates_skipped || 0;
+
           totalInserted += inserted;
+          totalParsedRows += parsedRows;
+          totalDuplicatesSkipped += duplicatesSkipped;
 
           if (data?.success && inserted > 0) {
             successFiles++;
@@ -346,6 +357,8 @@ export const AcademicRecordsImport = () => {
                       ...f,
                       status: 'success' as const,
                       recordsCount: inserted,
+                      parsedRows,
+                      duplicatesSkipped,
                       studentId: data.studentId || studentId,
                     }
                   : f
@@ -359,6 +372,8 @@ export const AcademicRecordsImport = () => {
                   ? {
                       ...f,
                       status: 'skipped' as const,
+                      parsedRows,
+                      duplicatesSkipped,
                       error: data?.error || 'No records inserted',
                     }
                   : f
@@ -414,6 +429,8 @@ export const AcademicRecordsImport = () => {
         failedFiles,
         skippedFiles,
         totalRecords: totalInserted,
+        totalParsedRows,
+        totalDuplicatesSkipped,
         importLogId,
       });
 
@@ -605,29 +622,56 @@ export const AcademicRecordsImport = () => {
 
               {/* Summary */}
               {summary && (
-                <Alert variant={summary.failedFiles === 0 ? 'default' : 'destructive'}>
-                  {summary.failedFiles === 0 ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
-                  <AlertDescription>
-                    <div className="space-y-2">
-                      <p className="font-medium">
-                        {t(
-                          `تم استيراد ${summary.totalRecords} سجل من ${summary.successFiles} ملف`,
-                          `Imported ${summary.totalRecords} records from ${summary.successFiles} files`
-                        )}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge variant="secondary">{summary.totalFiles} {t('إجمالي', 'total')}</Badge>
-                        <Badge className="bg-green-500/10 text-green-500">{summary.successFiles} {t('نجح', 'success')}</Badge>
-                        {summary.failedFiles > 0 && (
-                          <Badge variant="destructive">{summary.failedFiles} {t('فشل', 'failed')}</Badge>
-                        )}
-                        {summary.skippedFiles > 0 && (
-                          <Badge className="bg-yellow-500/10 text-yellow-500">{summary.skippedFiles} {t('تخطي', 'skipped')}</Badge>
-                        )}
+                <Card className="border-primary/20 bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {summary.failedFiles === 0 ? (
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-destructive" />
+                      )}
+                      {t('تقرير الاستيراد', 'Import Report')}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {/* Main stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-background rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-primary">{summary.totalRecords}</div>
+                        <div className="text-xs text-muted-foreground">{t('سجل مستورد', 'Records imported')}</div>
+                      </div>
+                      <div className="bg-background rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold">{summary.totalParsedRows}</div>
+                        <div className="text-xs text-muted-foreground">{t('صف مقروء', 'Rows parsed')}</div>
+                      </div>
+                      <div className="bg-background rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold text-yellow-500">{summary.totalDuplicatesSkipped}</div>
+                        <div className="text-xs text-muted-foreground">{t('مكرر (تم دمجه)', 'Duplicates merged')}</div>
+                      </div>
+                      <div className="bg-background rounded-lg p-3 text-center">
+                        <div className="text-2xl font-bold">{summary.totalFiles}</div>
+                        <div className="text-xs text-muted-foreground">{t('ملف', 'Files')}</div>
                       </div>
                     </div>
-                  </AlertDescription>
-                </Alert>
+
+                    {/* File stats */}
+                    <div className="flex flex-wrap gap-2">
+                      <Badge className="bg-green-500/10 text-green-500 border-green-500/20">
+                        {summary.successFiles} {t('نجح', 'success')}
+                      </Badge>
+                      {summary.failedFiles > 0 && (
+                        <Badge variant="destructive">
+                          {summary.failedFiles} {t('فشل', 'failed')}
+                        </Badge>
+                      )}
+                      {summary.skippedFiles > 0 && (
+                        <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+                          {summary.skippedFiles} {t('تخطي', 'skipped')}
+                        </Badge>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Actions */}
@@ -771,7 +815,9 @@ export const AcademicRecordsImport = () => {
                       <TableHead className="w-10"></TableHead>
                       <TableHead>{t('الملف', 'File')}</TableHead>
                       <TableHead>{t('الرقم الجامعي', 'Student ID')}</TableHead>
-                      <TableHead>{t('السجلات', 'Records')}</TableHead>
+                      <TableHead>{t('صفوف', 'Rows')}</TableHead>
+                      <TableHead>{t('مستورد', 'Imported')}</TableHead>
+                      <TableHead>{t('مكرر', 'Dupes')}</TableHead>
                       <TableHead>{t('الحالة', 'Status')}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -781,10 +827,12 @@ export const AcademicRecordsImport = () => {
                         <TableCell>{getStatusIcon(file.status)}</TableCell>
                         <TableCell className="font-mono text-xs max-w-48 truncate">{file.fileName}</TableCell>
                         <TableCell className="font-mono">{file.studentId}</TableCell>
-                        <TableCell>{file.recordsCount}</TableCell>
+                        <TableCell>{file.parsedRows || '-'}</TableCell>
+                        <TableCell className="text-green-600">{file.recordsCount || '-'}</TableCell>
+                        <TableCell className="text-yellow-600">{file.duplicatesSkipped || '-'}</TableCell>
                         <TableCell>
                           {file.error ? (
-                            <span className="text-xs text-red-500 max-w-32 truncate block">{file.error}</span>
+                            <span className="text-xs text-red-500 max-w-32 truncate block" title={file.error}>{file.error}</span>
                           ) : (
                             <Badge variant={file.status === 'success' ? 'default' : 'secondary'}>{file.status}</Badge>
                           )}
