@@ -76,17 +76,26 @@ export const AcademicRecordsImport = () => {
 
   // Convert Excel (xlsx/xls) ArrayBuffer to CSV using SheetJS
   const excelToCsv = (buffer: ArrayBuffer): string => {
-    const workbook = XLSX.read(buffer, { type: 'array' });
-    const sheetName = workbook.SheetNames?.[0];
-    if (!sheetName) {
-      throw new Error('No sheets found in Excel file');
+    try {
+      console.log('Converting Excel, buffer size:', buffer.byteLength);
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      console.log('Workbook sheets:', workbook.SheetNames);
+      const sheetName = workbook.SheetNames?.[0];
+      if (!sheetName) {
+        throw new Error('No sheets found in Excel file');
+      }
+      const worksheet = workbook.Sheets[sheetName];
+      const csv = XLSX.utils.sheet_to_csv(worksheet, {
+        FS: ',',
+        RS: '\n',
+        blankrows: false,
+      });
+      console.log('Converted CSV length:', csv.length, 'First 200 chars:', csv.substring(0, 200));
+      return csv;
+    } catch (error) {
+      console.error('Excel conversion error:', error);
+      throw error;
     }
-    const worksheet = workbook.Sheets[sheetName];
-    return XLSX.utils.sheet_to_csv(worksheet, {
-      FS: ',',
-      RS: '\n',
-      blankrows: false,
-    });
   };
 
   // RFC4180 CSV parser for preview
@@ -396,6 +405,13 @@ export const AcademicRecordsImport = () => {
         );
 
         try {
+          // Log the data being sent for debugging
+          console.log(`Sending file ${fileName}, csvData length: ${csvData?.length || 0}`);
+          
+          if (!csvData || csvData.trim().length === 0) {
+            throw new Error('CSV data is empty');
+          }
+          
           const { data, error } = await supabase.functions.invoke('import-student-records', {
             body: {
               csvData,
