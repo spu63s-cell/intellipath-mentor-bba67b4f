@@ -174,13 +174,16 @@ serve(async (req) => {
       });
     }
 
+    // Check if user has admin role (user may have multiple roles)
     const { data: roleData } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
-      .single();
+      .eq("role", "admin")
+      .maybeSingle();
 
-    if (!roleData || roleData.role !== "admin") {
+    if (!roleData) {
+      console.log(`User ${user.id} does not have admin role`);
       return new Response(JSON.stringify({ error: 'Admin access required' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
