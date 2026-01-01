@@ -7,6 +7,17 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   Upload, FileText, CheckCircle, AlertCircle, Loader2, Download, 
   Database, Archive, RefreshCw, XCircle, RotateCcw, Eye
@@ -44,9 +55,12 @@ interface PreviewData {
 export const AcademicRecordsImport = () => {
   const { t } = useLanguageStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cancelRef = useRef(false);
   
   const [fileStatuses, setFileStatuses] = useState<FileImportStatus[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const [isRollbacking, setIsRollbacking] = useState(false);
+  const [cancelRequested, setCancelRequested] = useState(false);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
   const [summary, setSummary] = useState<ImportSummary | null>(null);
@@ -90,7 +104,9 @@ export const AcademicRecordsImport = () => {
       return values;
     };
 
-    const headers = parseRow(lines[0]);
+    const headers = parseRow(lines[0]).map((h, idx) =>
+      idx === 0 ? h.replace(/^\uFEFF/, '') : h
+    );
     const rows: string[][] = [];
     let validRows = 0;
     let invalidRows = 0;
@@ -210,12 +226,54 @@ export const AcademicRecordsImport = () => {
     }
   };
 
+  const requestCancel = () => {
+    cancelRef.current = true;
+    setCancelRequested(true);
+    toast.message(t('جاري إيقاف الاستيراد...', 'Stopping import...'));
+  };
+
+  const rollbackLastImport = async () => {
+    if (!summary?.importLogId) return;
+
+    setIsRollbacking(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('import-student-records', {
+        body: {
+          action: 'rollback',
+          importLogId: summary.importLogId,
+        },
+      });
+
+      if (error) throw error;
+
+      const deleted = data?.deleted || 0;
+      toast.success(
+        t(`تم حذف ${deleted} سجل من هذا الاستيراد`, `Deleted ${deleted} records from this import`)
+      );
+
+      // Refresh local state
+      setSummary(null);
+      setFileStatuses([]);
+      setPreviewData(null);
+      setSelectedFileName('');
+      setZipFile(null);
+      setCsvContents(new Map());
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Rollback failed';
+      toast.error(t('فشل حذف الاستيراد', 'Rollback failed'), { description: msg });
+    } finally {
+      setIsRollbacking(false);
+    }
+  };
+
   const handleImport = async () => {
     if (csvContents.size === 0) {
       toast.error(t('يرجى اختيار ملف أولاً', 'Please select a file first'));
       return;
     }
 
+    cancelRef.current = false;
+    setCancelRequested(false);
     setIsImporting(true);
     setProgress(5);
     setProgressMessage(t('جاري التحضير...', 'Preparing...'));
@@ -246,24 +304,28 @@ export const AcademicRecordsImport = () => {
       let skippedFiles = 0;
 
       for (let i = 0; i < entries.length; i++) {
+        if (cancelRef.current) break;
+
         const [fileName, csvData] = entries[i];
         const studentId = extractStudentId(fileName);
-        
-        setProgressMessage(t(
-          `جاري استيراد ${i + 1} من ${entries.length}: ${fileName}`,
-          `Importing ${i + 1} of ${entries.length}: ${fileName}`
-        ));
+
+        setProgressMessage(
+          t(
+            `جاري استيراد ${i + 1} من ${entries.length}: ${fileName}`,
+            `Importing ${i + 1} of ${entries.length}: ${fileName}`
+          )
+        );
         setProgress(5 + ((i / entries.length) * 90));
 
         // Update status to importing
-        setFileStatuses(prev => prev.map(f => 
-          f.fileName === fileName ? { ...f, status: 'importing' as const } : f
-        ));
+        setFileStatuses(prev =>
+          prev.map(f => (f.fileName === fileName ? { ...f, status: 'importing' as const } : f))
+        );
 
         try {
           const { data, error } = await supabase.functions.invoke('import-student-records', {
-            body: { 
-              csvData, 
+            body: {
+              csvData,
               fileName,
               importLogId,
               useFilenameAsStudentId: true,
@@ -277,36 +339,50 @@ export const AcademicRecordsImport = () => {
 
           if (data?.success && inserted > 0) {
             successFiles++;
-            setFileStatuses(prev => prev.map(f => 
-              f.fileName === fileName ? { 
-                ...f, 
-                status: 'success' as const, 
-                recordsCount: inserted,
-                studentId: data.studentId || studentId,
-              } : f
-            ));
+            setFileStatuses(prev =>
+              prev.map(f =>
+                f.fileName === fileName
+                  ? {
+                      ...f,
+                      status: 'success' as const,
+                      recordsCount: inserted,
+                      studentId: data.studentId || studentId,
+                    }
+                  : f
+              )
+            );
           } else if (inserted === 0) {
             skippedFiles++;
-            setFileStatuses(prev => prev.map(f => 
-              f.fileName === fileName ? { 
-                ...f, 
-                status: 'skipped' as const,
-                error: data?.error || 'No records inserted',
-              } : f
-            ));
+            setFileStatuses(prev =>
+              prev.map(f =>
+                f.fileName === fileName
+                  ? {
+                      ...f,
+                      status: 'skipped' as const,
+                      error: data?.error || 'No records inserted',
+                    }
+                  : f
+              )
+            );
           }
         } catch (err) {
           failedFiles++;
           const errorMsg = err instanceof Error ? err.message : 'Unknown error';
-          setFileStatuses(prev => prev.map(f => 
-            f.fileName === fileName ? { 
-              ...f, 
-              status: 'failed' as const, 
-              error: errorMsg,
-            } : f
-          ));
+          setFileStatuses(prev =>
+            prev.map(f =>
+              f.fileName === fileName
+                ? {
+                    ...f,
+                    status: 'failed' as const,
+                    error: errorMsg,
+                  }
+                : f
+            )
+          );
         }
       }
+
+      const wasCancelled = cancelRef.current;
 
       // Update import log
       if (importLogId) {
@@ -316,10 +392,19 @@ export const AcademicRecordsImport = () => {
             total_records: entries.length,
             successful_records: successFiles,
             failed_records: failedFiles,
-            status: failedFiles === 0 ? 'completed' : 'completed_with_errors',
+            status: wasCancelled
+              ? 'cancelled'
+              : failedFiles === 0
+                ? 'completed'
+                : 'completed_with_errors',
             completed_at: new Date().toISOString(),
           })
           .eq('id', importLogId);
+      }
+
+      if (wasCancelled) {
+        setProgressMessage(t('تم إيقاف الاستيراد', 'Import stopped'));
+        toast.message(t('تم إيقاف الاستيراد', 'Import stopped'));
       }
 
       setProgress(100);
@@ -333,10 +418,12 @@ export const AcademicRecordsImport = () => {
       });
 
       if (successFiles > 0) {
-        toast.success(t(
-          `تم استيراد ${totalInserted} سجل من ${successFiles} ملف`,
-          `Imported ${totalInserted} records from ${successFiles} files`
-        ));
+        toast.success(
+          t(
+            `تم استيراد ${totalInserted} سجل من ${successFiles} ملف`,
+            `Imported ${totalInserted} records from ${successFiles} files`
+          )
+        );
       }
     } catch (error) {
       console.error('Import error:', error);
@@ -466,8 +553,8 @@ export const AcademicRecordsImport = () => {
               </CardTitle>
               <CardDescription>
                 {t(
-                  'ارفع ملف ZIP يحتوي ملفات CSV (اسم كل ملف = الرقم الجامعي)',
-                  'Upload ZIP file containing CSV files (filename = student ID)'
+                  'ارفع ملف CSV واحد (يحوي student_id) أو ملف ZIP يحتوي ملفات CSV (اسم كل ملف = الرقم الجامعي)',
+                  'Upload a single CSV (with student_id) or a ZIP containing CSV files (filename = student ID)'
                 )}
               </CardDescription>
             </CardHeader>
@@ -552,11 +639,29 @@ export const AcademicRecordsImport = () => {
                   size="lg"
                 >
                   {isImporting ? (
-                    <><Loader2 className="w-4 h-4 ml-2 animate-spin" />{t('جاري الاستيراد...', 'Importing...')}</>
+                    <>
+                      <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                      {t('جاري الاستيراد...', 'Importing...')}
+                    </>
                   ) : (
-                    <><Database className="w-4 h-4 ml-2" />{t('بدء الاستيراد', 'Start Import')}</>
+                    <>
+                      <Database className="w-4 h-4 ml-2" />
+                      {t('بدء الاستيراد', 'Start Import')}
+                    </>
                   )}
                 </Button>
+
+                {isImporting && (
+                  <Button
+                    variant="outline"
+                    onClick={requestCancel}
+                    disabled={cancelRequested}
+                    size="lg"
+                  >
+                    <XCircle className="w-4 h-4 ml-2" />
+                    {cancelRequested ? t('جاري الإيقاف...', 'Stopping...') : t('إيقاف', 'Stop')}
+                  </Button>
+                )}
                 
                 {fileStatuses.some(f => f.status === 'failed') && (
                   <Button variant="outline" onClick={retryFailed} disabled={isImporting}>
@@ -564,7 +669,35 @@ export const AcademicRecordsImport = () => {
                     {t('إعادة الفاشل', 'Retry Failed')}
                   </Button>
                 )}
-                
+
+                {summary?.importLogId && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="destructive" disabled={isImporting || isRollbacking}>
+                        <XCircle className="w-4 h-4 ml-2" />
+                        {t('حذف هذا الاستيراد', 'Delete this import')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('تأكيد حذف الاستيراد', 'Confirm rollback')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t(
+                            'سيتم حذف السجلات التي تم إنشاؤها بواسطة هذا الاستيراد فقط. لا يمكن التراجع عن العملية.',
+                            'This will delete only records created by this import. This action cannot be undone.'
+                          )}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>{t('إلغاء', 'Cancel')}</AlertDialogCancel>
+                        <AlertDialogAction onClick={rollbackLastImport}>
+                          {isRollbacking ? t('جاري الحذف...', 'Deleting...') : t('تأكيد الحذف', 'Confirm delete')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+
                 <Button variant="outline" onClick={downloadTemplate}>
                   <Download className="w-4 h-4 ml-2" />
                   {t('قالب', 'Template')}
@@ -675,8 +808,8 @@ export const AcademicRecordsImport = () => {
           </CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p>• {t('اسم كل ملف CSV يجب أن يكون الرقم الجامعي (مثال: 4220212.csv)', 'Each CSV filename must be the student ID (e.g., 4220212.csv)')}</p>
-          <p>• {t('يمكنك رفع ملف ZIP يحتوي عدة ملفات CSV دفعة واحدة', 'You can upload a ZIP file containing multiple CSV files at once')}</p>
+          <p>• {t('يمكنك رفع ملف CSV واحد يحتوي student_id أو رفع ملف ZIP يحتوي عدة ملفات CSV دفعة واحدة', 'You can upload a single CSV with student_id, or a ZIP containing multiple CSV files')}</p>
+          <p>• {t('في ZIP: اسم كل ملف CSV يفضّل أن يكون الرقم الجامعي (مثال: 4220212.csv)', 'In ZIP: each CSV filename should be the student ID (e.g., 4220212.csv)')}</p>
           <p>• {t('الملفات التي تفشل يمكن إعادة محاولتها بشكل منفصل', 'Failed files can be retried separately')}</p>
           <p>• {t('الطالب يرى بياناته فقط - المرشد يرى طلابه - الإدمن يرى الكل', 'Student sees own data - Advisor sees assigned students - Admin sees all')}</p>
         </CardContent>
