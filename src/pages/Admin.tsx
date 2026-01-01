@@ -20,7 +20,7 @@ import {
 import { StudentDataImport } from '@/components/admin/StudentDataImport';
 import { CourseDataImport } from '@/components/admin/CourseDataImport';
 import { AdvisorAssignments } from '@/components/admin/AdvisorAssignments';
-import { StudentRecordsImport } from '@/components/admin/StudentRecordsImport';
+import { AcademicRecordsImport } from '@/components/admin/AcademicRecordsImport';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAdminUsers, useAdminCourses, useSendNotification } from '@/hooks/useAdminData';
 import { toast } from 'sonner';
@@ -265,7 +265,7 @@ const Admin = () => {
 
             {/* Import Academic Records Tab */}
             <TabsContent value="import-records">
-              <StudentRecordsImport />
+              <AcademicRecordsImport />
             </TabsContent>
 
             {/* Import Courses Tab */}
