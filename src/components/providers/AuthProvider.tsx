@@ -2,6 +2,23 @@ import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 
+// Priority order: admin > advisor > student
+const getRolePriority = (role: string): number => {
+  switch (role) {
+    case 'admin': return 3;
+    case 'advisor': return 2;
+    case 'student': return 1;
+    default: return 0;
+  }
+};
+
+const getHighestRole = (roles: { role: string }[]): 'student' | 'advisor' | 'admin' | null => {
+  if (!roles || roles.length === 0) return null;
+  
+  const sortedRoles = roles.sort((a, b) => getRolePriority(b.role) - getRolePriority(a.role));
+  return sortedRoles[0].role as 'student' | 'advisor' | 'admin';
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setSession, setIsLoading, setUserRole, reset } = useAuthStore();
 
@@ -12,17 +29,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Fetch user role with setTimeout to prevent deadlock
+        // Fetch user roles with setTimeout to prevent deadlock
         if (session?.user) {
           setTimeout(async () => {
-            const { data: roleData } = await supabase
+            const { data: rolesData } = await supabase
               .from('user_roles')
               .select('role')
-              .eq('user_id', session.user.id)
-              .single();
+              .eq('user_id', session.user.id);
             
-            if (roleData) {
-              setUserRole(roleData.role as 'student' | 'advisor' | 'admin');
+            if (rolesData && rolesData.length > 0) {
+              const highestRole = getHighestRole(rolesData);
+              setUserRole(highestRole);
             }
           }, 0);
         } else {
@@ -43,10 +60,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
-          .single()
-          .then(({ data: roleData }) => {
-            if (roleData) {
-              setUserRole(roleData.role as 'student' | 'advisor' | 'admin');
+          .then(({ data: rolesData }) => {
+            if (rolesData && rolesData.length > 0) {
+              const highestRole = getHighestRole(rolesData);
+              setUserRole(highestRole);
             }
           });
       }
