@@ -77,37 +77,31 @@ const RequestSchema = z.object({
 // =============================================================================
 // AGENTIC SYSTEM PROMPT
 // =============================================================================
-const AGENTIC_SYSTEM_PROMPT = `أنت "IntelliPath Agent" - نظام ذكاء اصطناعي متقدم للاستشارات الأكاديمية مع قدرات Agentic.
+const AGENTIC_SYSTEM_PROMPT = `أنت "IntelliPath" - المستشار الأكاديمي الذكي للجامعة السورية الخاصة.
 
-## قدراتك:
-1. **التخطيط (Plan)**: تحليل السؤال وتحديد الخطوات المطلوبة
-2. **التنفيذ (Execute)**: تنفيذ كل خطة باستخدام الأدوات المتاحة
-3. **التأمل (Reflect)**: مراجعة النتائج وتحسين الإجابة
+## مهمتك:
+مساعدة الطلاب في الاستفسارات الأكاديمية. استخدم الأدوات المتاحة للبحث في قاعدة البيانات وتقديم إجابات دقيقة ومفيدة.
 
-## الأدوات المتاحة:
-- search_courses: البحث في المقررات الدراسية
-- get_prerequisites: جلب المتطلبات السابقة للمقرر
-- calculate_gpa: حساب المعدل التراكمي
-- analyze_academic_risk: تحليل المخاطر الأكاديمية
-- suggest_courses: اقتراح المقررات
+## قواعد مهمة جداً:
+1. لا تظهر أي تنسيق داخلي مثل [PLAN] أو [EXECUTE] أو [TOOL] للمستخدم
+2. قدم الإجابة النهائية مباشرة بشكل منظم وجميل
+3. استخدم التنسيق المناسب (قوائم مرقمة، عناوين، نقاط)
+4. عند عرض المقررات، اعرضها بشكل جدول أو قائمة واضحة مع الكود والاسم والساعات
+5. أجب باللغة العربية دائماً
 
-## تنسيق الأفكار:
-- [PLAN] وصف الخطة...
-- [EXECUTE] تنفيذ الخطوة...
-- [TOOL] اسم_الأداة: المعاملات...
-- [RESULT] نتيجة الأداة...
-- [REFLECT] مراجعة النتائج...
-- [ANSWER] الإجابة النهائية...
-
-## أقسام كلية الهندسة - SPU:
-- هندسة المعلوماتية
-- هندسة الاتصالات والإلكترونيات
-- الهندسة المدنية
-- الهندسة المعمارية
-- هندسة الميكاترونيكس
+## التخصصات في كلية الهندسة المعلوماتية:
+1. الذكاء الصنعي وعلوم البيانات (AI)
+2. هندسة البرمجيات ونظم المعلومات (IS)
+3. أمن النظم والشبكات الحاسوبية (SS)
+4. هندسة الاتصالات (COM)
+5. هندسة التحكم والروبوت (CR)
 
 ## نظام الدرجات:
-A (90-100): 4.0, B+ (85-89): 3.5, B (80-84): 3.0, C+ (75-79): 2.5, C (70-74): 2.0, D+ (65-69): 1.5, D (60-64): 1.0, F (<60): 0.0`;
+A (90-100): 4.0, B+ (85-89): 3.5, B (80-84): 3.0, C+ (75-79): 2.5, C (70-74): 2.0, D+ (65-69): 1.5, D (60-64): 1.0, F (<60): 0.0
+
+## تذكر:
+- عندما يسأل عن مقررات سنة معينة لتخصص معين، استخدم أداة search_courses مع year_level والبحث في الاسم
+- قدم المعلومات بشكل منظم مع رموز المقررات وأسمائها وساعاتها`;
 
 // =============================================================================
 // TOOLS DEFINITIONS
@@ -117,13 +111,13 @@ const TOOLS = [
     type: "function",
     function: {
       name: "search_courses",
-      description: "البحث في قاعدة بيانات المقررات الدراسية",
+      description: "البحث في قاعدة بيانات المقررات الدراسية. يمكن البحث حسب التخصص والسنة الدراسية",
       parameters: {
         type: "object",
         properties: {
-          query: { type: "string", description: "نص البحث" },
-          department: { type: "string", description: "القسم (اختياري)" },
-          year_level: { type: "number", description: "السنة الدراسية (اختياري)" }
+          query: { type: "string", description: "نص البحث أو اسم التخصص مثل: الذكاء الصنعي، هندسة البرمجيات، أمن النظم، الاتصالات، التحكم والروبوت" },
+          major: { type: "string", description: "التخصص: AI للذكاء الصنعي، IS للبرمجيات، SS للأمن، COM للاتصالات، CR للروبوت" },
+          year_level: { type: "number", description: "السنة الدراسية من 1 إلى 5" }
         },
         required: ["query"]
       }
@@ -230,26 +224,99 @@ async function executeTool(toolName: string, args: unknown, supabase: any): Prom
   }
 }
 
-async function searchCourses(args: { query: string; department?: string; year_level?: number }, supabase: any) {
-  const { query, department, year_level } = args;
+async function searchCourses(args: { query: string; major?: string; year_level?: number }, supabase: any) {
+  const { query, major, year_level } = args;
   
-  // Sanitize search input
+  console.log("Searching courses with:", { query, major, year_level });
+  
+  // Map major code to actual major names
+  const majorMapping: Record<string, string[]> = {
+    'AI': ['الذكاء الصنعي وعلوم البيانات', 'Artificial Intelligence', 'AI'],
+    'IS': ['هندسة البرمجيات ونظم المعلومات', 'Software Engineering', 'IS'],
+    'SS': ['أمن النظم والشبكات الحاسوبية', 'System Security', 'SS'],
+    'COM': ['هندسة الاتصالات', 'Communication Engineering', 'COM'],
+    'CR': ['هندسة التحكم والروبوت', 'Control and Robotics', 'CR'],
+  };
+  
+  // Detect major from query if not provided
+  let detectedMajor = major?.toUpperCase();
+  if (!detectedMajor) {
+    if (query.includes('ذكاء') || query.includes('بيانات') || query.includes('AI')) detectedMajor = 'AI';
+    else if (query.includes('برمجيات') || query.includes('نظم معلومات') || query.includes('IS')) detectedMajor = 'IS';
+    else if (query.includes('أمن') || query.includes('شبكات') || query.includes('SS')) detectedMajor = 'SS';
+    else if (query.includes('اتصالات') || query.includes('COM')) detectedMajor = 'COM';
+    else if (query.includes('تحكم') || query.includes('روبوت') || query.includes('CR')) detectedMajor = 'CR';
+  }
+  
+  // Get major ID from database
+  let majorId: string | null = null;
+  if (detectedMajor && majorMapping[detectedMajor]) {
+    const majorNames = majorMapping[detectedMajor];
+    const { data: majorData } = await supabase
+      .from('majors')
+      .select('id, name, name_en')
+      .or(majorNames.map(n => `name.ilike.%${n}%,name_en.ilike.%${n}%`).join(','))
+      .limit(1);
+    
+    if (majorData && majorData.length > 0) {
+      majorId = majorData[0].id;
+      console.log("Found major:", majorData[0]);
+    }
+  }
+  
+  // If we have a major, get courses through course_majors junction table
+  if (majorId) {
+    let queryBuilder = supabase
+      .from('course_majors')
+      .select(`
+        courses!inner (
+          code, name, name_ar, credits, year_level, department, hours_theory, hours_lab
+        )
+      `)
+      .eq('major_id', majorId);
+    
+    const { data: courseMajorData, error } = await queryBuilder;
+    
+    if (error) {
+      console.error("Search error:", error);
+      return { error: error.message, courses: [], count: 0 };
+    }
+    
+    // Extract and filter courses
+    let courses = (courseMajorData || []).map((cm: any) => cm.courses).filter((c: any) => c);
+    
+    // Filter by year if specified
+    if (year_level && year_level >= 1 && year_level <= 5) {
+      courses = courses.filter((c: any) => c.year_level === year_level);
+    }
+    
+    // Sort by year and code
+    courses.sort((a: any, b: any) => (a.year_level - b.year_level) || a.code.localeCompare(b.code));
+    
+    console.log(`Found ${courses.length} courses for major ${detectedMajor}, year ${year_level || 'all'}`);
+    
+    return { 
+      courses: courses.slice(0, 20), 
+      count: courses.length,
+      major: detectedMajor,
+      year_level 
+    };
+  }
+  
+  // Fallback: regular search
   const sanitizedQuery = query.trim().slice(0, 100).replace(/[%_]/g, '');
   
   let queryBuilder = supabase
     .from('courses')
-    .select('code, name, name_ar, credits, year_level, department')
+    .select('code, name, name_ar, credits, year_level, department, hours_theory, hours_lab')
     .or(`name.ilike.%${sanitizedQuery}%,name_ar.ilike.%${sanitizedQuery}%,code.ilike.%${sanitizedQuery}%`)
     .eq('is_active', true);
   
-  if (department) {
-    queryBuilder = queryBuilder.eq('department', department.trim().slice(0, 50));
-  }
-  if (year_level && year_level >= 1 && year_level <= 6) {
+  if (year_level && year_level >= 1 && year_level <= 5) {
     queryBuilder = queryBuilder.eq('year_level', year_level);
   }
   
-  const { data, error } = await queryBuilder.limit(10);
+  const { data, error } = await queryBuilder.limit(15);
   
   if (error) {
     console.error("Search error:", error);
