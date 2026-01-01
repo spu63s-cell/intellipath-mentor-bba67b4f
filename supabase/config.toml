@@ -64,3 +64,6 @@ verify_jwt = true
 
 [functions.sync-neo4j]
 verify_jwt = true
+
+[functions.cleanup-job]
+verify_jwt = true
