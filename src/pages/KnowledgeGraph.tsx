@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
-import { Network, Options } from 'vis-network/standalone';
-import { motion } from 'framer-motion';
-import { Search, ZoomIn, ZoomOut, Maximize2, Info, BookOpen, Route, Loader2, GraduationCap, ArrowRight, Clock } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Search, ZoomIn, ZoomOut, Info, BookOpen, Route, Loader2, GraduationCap, ArrowRight, Clock, Download, Eye, ChevronLeft, ChevronRight, ArrowDown, Grid3X3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -19,11 +18,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface GraphNode {
   id: string;
@@ -36,6 +41,7 @@ interface GraphNode {
   semester?: number;
   hours_theory?: number;
   hours_lab?: number;
+  is_bottleneck?: boolean;
 }
 
 interface GraphEdge {
@@ -62,27 +68,23 @@ const yearColors: Record<number, string> = {
   5: '#8B5CF6', // Purple - Year 5
 };
 
-// Color palette for course types based on code prefix
-const courseTypeColors: Record<string, { bg: string; border: string; label: string; label_ar: string }> = {
-  'CIFC': { bg: '#1E3A8A', border: '#3B82F6', label: 'Core/Foundation', label_ar: 'أساسية' },
-  'CIEC': { bg: '#065F46', border: '#10B981', label: 'Software Engineering', label_ar: 'هندسة برمجيات' },
-  'CIAC': { bg: '#7C2D12', border: '#F97316', label: 'AI & Data Science', label_ar: 'ذكاء صنعي' },
-  'CISC': { bg: '#701A75', border: '#D946EF', label: 'Security', label_ar: 'أمن' },
-  'CICC': { bg: '#0E7490', border: '#06B6D4', label: 'Communications', label_ar: 'اتصالات' },
-  'CIRC': { bg: '#B45309', border: '#FBBF24', label: 'Robotics', label_ar: 'روبوت' },
-  'CIUR': { bg: '#6B7280', border: '#9CA3AF', label: 'University Req', label_ar: 'متطلبات جامعة' },
-  'CIFR': { bg: '#4B5563', border: '#9CA3AF', label: 'Faculty Req', label_ar: 'متطلبات كلية' },
-  'CIEE': { bg: '#1F2937', border: '#6B7280', label: 'Elective', label_ar: 'اختياري' },
+// Category colors based on course type
+const categoryColors: Record<string, { bg: string; border: string; text: string; label: string; label_ar: string }> = {
+  'university': { bg: 'hsl(var(--muted))', border: 'hsl(var(--border))', text: 'hsl(var(--muted-foreground))', label: 'University Req', label_ar: 'متطلبات جامعة' },
+  'faculty': { bg: 'hsl(217 91% 60% / 0.15)', border: 'hsl(217 91% 60%)', text: 'hsl(217 91% 60%)', label: 'Faculty Req', label_ar: 'متطلبات كلية' },
+  'specialization': { bg: 'hsl(142 76% 36% / 0.15)', border: 'hsl(142 76% 36%)', text: 'hsl(142 76% 36%)', label: 'Specialization', label_ar: 'تخصص' },
+  'elective': { bg: 'hsl(280 65% 60% / 0.15)', border: 'hsl(280 65% 60%)', text: 'hsl(280 65% 60%)', label: 'Elective', label_ar: 'اختياري' },
 };
 
-const getCourseTypeColor = (code: string): { bg: string; border: string } => {
-  const prefix = code.substring(0, 4);
-  return courseTypeColors[prefix] || { bg: '#374151', border: '#6B7280' };
+// Get category from course code
+const getCourseCategory = (code: string): string => {
+  if (code.startsWith('CIUR')) return 'university';
+  if (code.startsWith('CIFR')) return 'faculty';
+  if (code.startsWith('CIEE')) return 'elective';
+  return 'specialization';
 };
 
 export default function KnowledgeGraph() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const networkRef = useRef<Network | null>(null);
   const { language } = useLanguageStore();
   const { toast } = useToast();
   const isRTL = language === 'ar';
@@ -96,8 +98,9 @@ export default function KnowledgeGraph() {
   const [majors, setMajors] = useState<Major[]>([]);
   const [prerequisites, setPrerequisites] = useState<GraphNode[]>([]);
   const [dependents, setDependents] = useState<GraphNode[]>([]);
-  const [viewMode, setViewMode] = useState<'hierarchy' | 'semester'>('hierarchy');
   const [isLoading, setIsLoading] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [highlightedPath, setHighlightedPath] = useState<Set<string>>(new Set());
 
   const t = (ar: string, en: string) => isRTL ? ar : en;
 
@@ -182,6 +185,7 @@ export default function KnowledgeGraph() {
           semester: c.semester ? parseInt(c.semester) : undefined,
           hours_theory: c.hours_theory || undefined,
           hours_lab: c.hours_lab || undefined,
+          is_bottleneck: c.is_bottleneck || false,
         }));
 
         // Get prerequisites for these courses
@@ -234,230 +238,136 @@ export default function KnowledgeGraph() {
     };
   }, [graphData]);
 
-  // Filter nodes for visualization
-  const filteredNodes = useMemo(() => {
-    if (!graphData) return [];
+  // Group courses by year
+  const coursesByYear = useMemo(() => {
+    if (!graphData) return {};
     
-    let nodes = graphData.nodes;
-    
-    if (selectedYear !== 'all') {
-      nodes = nodes.filter(c => c.year_level === parseInt(selectedYear));
+    const grouped: Record<number, GraphNode[]> = {};
+    for (let year = 1; year <= 5; year++) {
+      grouped[year] = [];
     }
     
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      nodes = nodes.filter(
-        c => c.name?.toLowerCase().includes(query) || 
-             c.name_ar?.includes(query) || 
-             c.code?.toLowerCase().includes(query)
-      );
-    }
-    
-    return nodes;
-  }, [graphData, selectedYear, searchQuery]);
-
-  // Render network
-  useEffect(() => {
-    if (!containerRef.current || !graphData || filteredNodes.length === 0) return;
-
-    const filteredIds = new Set(filteredNodes.map(c => c.id));
-
-    // Create vis-network nodes with enhanced styling
-    const nodes = filteredNodes.map(course => {
-      const typeColor = getCourseTypeColor(course.code);
-      const yearColor = yearColors[course.year_level] || '#6B7280';
-      
-      return {
-        id: course.id,
-        label: `${course.code}\n${isRTL ? (course.name_ar || course.name) : course.name}`,
-        title: `
-          <div style="direction: ${isRTL ? 'rtl' : 'ltr'}; padding: 8px; font-family: system-ui;">
-            <strong>${course.code}</strong><br/>
-            ${isRTL ? (course.name_ar || course.name) : course.name}<br/>
-            <span style="color: #888;">${course.credits} ${t('ساعات معتمدة', 'credits')}</span><br/>
-            <span style="color: #888;">${t('السنة', 'Year')} ${course.year_level}</span>
-          </div>
-        `,
-        color: {
-          background: typeColor.bg,
-          border: yearColor,
-          highlight: { background: typeColor.bg, border: '#fff' },
-          hover: { background: typeColor.bg, border: '#fff' },
-        },
-        font: { 
-          color: '#fff', 
-          size: 11, 
-          face: 'system-ui, Cairo, sans-serif',
-          multi: 'html'
-        },
-        shape: 'box',
-        borderWidth: 3,
-        borderWidthSelected: 5,
-        margin: { top: 8, right: 12, bottom: 8, left: 12 },
-        shadow: {
-          enabled: true,
-          color: 'rgba(0,0,0,0.3)',
-          size: 10,
-          x: 2,
-          y: 2
-        },
-        level: viewMode === 'hierarchy' ? course.year_level : (course.semester || course.year_level * 2),
-      };
-    });
-
-    // Create vis-network edges
-    const edges = graphData.edges
-      .filter(e => filteredIds.has(e.from))
-      .map((edge, i) => ({
-        id: `e${i}`,
-        from: edge.from,
-        to: edge.to,
-        arrows: { to: { enabled: true, scaleFactor: 0.7, type: 'arrow' } },
-        color: { 
-          color: 'rgba(148, 163, 184, 0.6)', 
-          highlight: '#14B8A6',
-          hover: '#14B8A6'
-        },
-        width: 1.5,
-        smooth: { 
-          enabled: true, 
-          type: 'cubicBezier' as const, 
-          roundness: 0.4,
-          forceDirection: 'vertical'
-        },
-        hoverWidth: 2.5,
-      }));
-
-    // Network options
-    const options: Options = {
-      layout: {
-        hierarchical: {
-          enabled: true,
-          direction: 'UD',
-          sortMethod: 'directed',
-          levelSeparation: 150,
-          nodeSpacing: 200,
-          treeSpacing: 250,
-          blockShifting: true,
-          edgeMinimization: true,
-          parentCentralization: true,
-        },
-      },
-      physics: {
-        enabled: false,
-      },
-      interaction: {
-        hover: true,
-        tooltipDelay: 100,
-        navigationButtons: false,
-        keyboard: {
-          enabled: true,
-          bindToWindow: false
-        },
-        zoomView: true,
-        dragView: true,
-        dragNodes: true,
-        multiselect: false,
-      },
-      nodes: {
-        borderWidth: 2,
-        shadow: true,
-      },
-      edges: {
-        smooth: true,
-      },
-    };
-
-    // Create network
-    networkRef.current = new Network(containerRef.current, { nodes, edges }, options);
-
-    // Handle click
-    networkRef.current.on('click', async (params) => {
-      if (params.nodes.length > 0) {
-        const courseId = params.nodes[0];
-        const course = graphData.nodes.find(c => c.id === courseId);
-        if (course) {
-          setSelectedCourse(course);
-          
-          // Load prerequisites from Supabase
-          const { data: prereqIds } = await supabase
-            .from('course_prerequisites')
-            .select('prerequisite_id')
-            .eq('course_id', course.id);
-          
-          if (prereqIds && prereqIds.length > 0) {
-            const pIds = prereqIds.map(p => p.prerequisite_id);
-            const { data: prereqCourses } = await supabase
-              .from('courses')
-              .select('*')
-              .in('id', pIds);
-            
-            setPrerequisites((prereqCourses || []).map(c => ({
-              id: c.id,
-              code: c.code,
-              name: c.name,
-              name_ar: c.name_ar || undefined,
-              credits: c.credits,
-              department: c.department,
-              year_level: c.year_level,
-            })));
-          } else {
-            setPrerequisites([]);
-          }
-          
-          // Load dependents from Supabase
-          const { data: depIds } = await supabase
-            .from('course_prerequisites')
-            .select('course_id')
-            .eq('prerequisite_id', course.id);
-          
-          if (depIds && depIds.length > 0) {
-            const dIds = depIds.map(d => d.course_id);
-            const { data: depCourses } = await supabase
-              .from('courses')
-              .select('*')
-              .in('id', dIds);
-            
-            setDependents((depCourses || []).map(c => ({
-              id: c.id,
-              code: c.code,
-              name: c.name,
-              name_ar: c.name_ar || undefined,
-              credits: c.credits,
-              department: c.department,
-              year_level: c.year_level,
-            })));
-          } else {
-            setDependents([]);
-          }
-          
-          setShowDialog(true);
-        }
+    graphData.nodes.forEach(node => {
+      if (grouped[node.year_level]) {
+        grouped[node.year_level].push(node);
       }
     });
+    
+    // Sort courses within each year by code
+    Object.keys(grouped).forEach(year => {
+      grouped[parseInt(year)].sort((a, b) => a.code.localeCompare(b.code));
+    });
+    
+    return grouped;
+  }, [graphData]);
 
-    // Fit to view after rendering
-    setTimeout(() => {
-      networkRef.current?.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
-    }, 100);
+  // Filter nodes for search
+  const filteredNodes = useMemo(() => {
+    if (!graphData) return new Set<string>();
+    
+    if (!searchQuery) return new Set(graphData.nodes.map(n => n.id));
+    
+    const query = searchQuery.toLowerCase();
+    const matches = graphData.nodes.filter(
+      c => c.name?.toLowerCase().includes(query) || 
+           c.name_ar?.includes(query) || 
+           c.code?.toLowerCase().includes(query)
+    );
+    
+    return new Set(matches.map(n => n.id));
+  }, [graphData, searchQuery]);
 
-    return () => {
-      networkRef.current?.destroy();
-    };
-  }, [graphData, filteredNodes, isRTL, viewMode]);
+  // Handle course click
+  const handleCourseClick = useCallback(async (course: GraphNode) => {
+    setSelectedCourse(course);
+    
+    // Load prerequisites from Supabase
+    const { data: prereqIds } = await supabase
+      .from('course_prerequisites')
+      .select('prerequisite_id')
+      .eq('course_id', course.id);
+    
+    if (prereqIds && prereqIds.length > 0) {
+      const pIds = prereqIds.map(p => p.prerequisite_id);
+      const { data: prereqCourses } = await supabase
+        .from('courses')
+        .select('*')
+        .in('id', pIds);
+      
+      setPrerequisites((prereqCourses || []).map(c => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        name_ar: c.name_ar || undefined,
+        credits: c.credits,
+        department: c.department,
+        year_level: c.year_level,
+      })));
+      
+      // Highlight prerequisite path
+      setHighlightedPath(new Set([course.id, ...pIds]));
+    } else {
+      setPrerequisites([]);
+      setHighlightedPath(new Set([course.id]));
+    }
+    
+    // Load dependents from Supabase
+    const { data: depIds } = await supabase
+      .from('course_prerequisites')
+      .select('course_id')
+      .eq('prerequisite_id', course.id);
+    
+    if (depIds && depIds.length > 0) {
+      const dIds = depIds.map(d => d.course_id);
+      const { data: depCourses } = await supabase
+        .from('courses')
+        .select('*')
+        .in('id', dIds);
+      
+      setDependents((depCourses || []).map(c => ({
+        id: c.id,
+        code: c.code,
+        name: c.name,
+        name_ar: c.name_ar || undefined,
+        credits: c.credits,
+        department: c.department,
+        year_level: c.year_level,
+      })));
+    } else {
+      setDependents([]);
+    }
+    
+    setShowDialog(true);
+  }, []);
 
-  const handleZoomIn = () => {
-    const scale = networkRef.current?.getScale() || 1;
-    networkRef.current?.moveTo({ scale: scale * 1.3, animation: { duration: 300, easingFunction: 'easeInOutQuad' } });
-  };
+  // Get prerequisite arrows for a course
+  const getPrerequisiteArrows = useCallback((courseId: string) => {
+    if (!graphData) return [];
+    return graphData.edges.filter(e => e.to === courseId).map(e => e.from);
+  }, [graphData]);
 
-  const handleZoomOut = () => {
-    const scale = networkRef.current?.getScale() || 1;
-    networkRef.current?.moveTo({ scale: scale / 1.3, animation: { duration: 300, easingFunction: 'easeInOutQuad' } });
-  };
+  // Check if an edge exists between two courses
+  const hasEdge = useCallback((fromId: string, toId: string) => {
+    if (!graphData) return false;
+    return graphData.edges.some(e => e.from === fromId && e.to === toId);
+  }, [graphData]);
 
-  const handleFit = () => {
-    networkRef.current?.fit({ animation: { duration: 500, easingFunction: 'easeInOutQuad' } });
+  const handleZoomIn = () => setZoomLevel(z => Math.min(z * 1.2, 2));
+  const handleZoomOut = () => setZoomLevel(z => Math.max(z / 1.2, 0.5));
+
+  // Download plan PDF
+  const handleDownloadPlan = () => {
+    const majorCode = majors.find(m => m.id === selectedMajor)?.name_en?.toLowerCase() || '';
+    let pdfName = '';
+    if (majorCode.includes('artificial') || majorCode.includes('ai')) pdfName = 'AI-BW-3.pdf';
+    else if (majorCode.includes('software') || majorCode.includes('information systems')) pdfName = 'IS-BW-3.pdf';
+    else if (majorCode.includes('security') || majorCode.includes('network')) pdfName = 'SS-BW-3.pdf';
+    else if (majorCode.includes('communication')) pdfName = 'COM-BW-3.pdf';
+    else if (majorCode.includes('control') || majorCode.includes('robot')) pdfName = 'CR-BW-3.pdf';
+    
+    if (pdfName) {
+      window.open(`/data/plans/${pdfName}`, '_blank');
+    }
   };
 
   const selectedMajorData = majors.find(m => m.id === selectedMajor);
@@ -467,7 +377,7 @@ export default function KnowledgeGraph() {
       <div className="flex h-[calc(100vh-4rem-4rem)] flex-col md:h-[calc(100vh-4rem)]">
         {/* Header */}
         <div className="border-b border-border bg-background p-4">
-          <div className="mx-auto max-w-7xl">
+          <div className="mx-auto max-w-full">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <motion.div
@@ -481,7 +391,7 @@ export default function KnowledgeGraph() {
                   }}
                   transition={{ duration: 2, repeat: Infinity }}
                 >
-                  <Route className="h-6 w-6" />
+                  <Grid3X3 className="h-6 w-6" />
                 </motion.div>
                 <div>
                   <h1 className="text-xl font-bold text-foreground md:text-2xl">
@@ -502,8 +412,9 @@ export default function KnowledgeGraph() {
                 <Button variant="outline" size="icon" onClick={handleZoomOut} title={t('تصغير', 'Zoom Out')}>
                   <ZoomOut className="h-4 w-4" />
                 </Button>
-                <Button variant="outline" size="icon" onClick={handleFit} title={t('ملائمة', 'Fit')}>
-                  <Maximize2 className="h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={handleDownloadPlan} className="gap-2">
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline">{t('تحميل PDF', 'Download PDF')}</span>
                 </Button>
               </div>
             </div>
@@ -536,122 +447,211 @@ export default function KnowledgeGraph() {
                 />
               </div>
 
-              {/* Year Filter */}
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder={t('السنة', 'Year')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('جميع السنوات', 'All Years')}</SelectItem>
-                  <SelectItem value="1">{t('السنة 1', 'Year 1')}</SelectItem>
-                  <SelectItem value="2">{t('السنة 2', 'Year 2')}</SelectItem>
-                  <SelectItem value="3">{t('السنة 3', 'Year 3')}</SelectItem>
-                  <SelectItem value="4">{t('السنة 4', 'Year 4')}</SelectItem>
-                  <SelectItem value="5">{t('السنة 5', 'Year 5')}</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Stats */}
+              {stats && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">
+                    {stats.totalCourses} {t('مقرر', 'courses')}
+                  </Badge>
+                  <Badge variant="outline">
+                    {stats.totalCredits} {t('ساعة', 'credits')}
+                  </Badge>
+                  <Badge variant="outline">
+                    {stats.totalEdges} {t('علاقة', 'relations')}
+                  </Badge>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Graph Container */}
-        <div className="relative flex-1 bg-gradient-to-br from-muted/30 to-muted/10">
-          {isLoading ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
-                <p className="mt-3 text-muted-foreground">
-                  {t('جاري تحميل الرسم البياني...', 'Loading graph...')}
-                </p>
+        {/* Graph Container - Grid Layout */}
+        <ScrollArea className="flex-1">
+          <div 
+            className="min-w-[1400px] p-6"
+            style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top left' }}
+          >
+            {isLoading ? (
+              <div className="flex h-96 items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="mx-auto h-10 w-10 animate-spin text-primary" />
+                  <p className="mt-3 text-muted-foreground">
+                    {t('جاري تحميل الرسم البياني...', 'Loading graph...')}
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : filteredNodes.length === 0 ? (
-            <div className="flex h-full items-center justify-center">
-              <div className="text-center">
-                <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <p className="mt-3 text-muted-foreground">
-                  {t('لا توجد مقررات مطابقة', 'No matching courses')}
-                </p>
+            ) : graphData && graphData.nodes.length === 0 ? (
+              <div className="flex h-96 items-center justify-center">
+                <div className="text-center">
+                  <BookOpen className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <p className="mt-3 text-muted-foreground">
+                    {t('لا توجد مقررات', 'No courses found')}
+                  </p>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div ref={containerRef} className="h-full w-full" />
-          )}
-          
-          {/* Legend Card */}
-          <Card className="absolute bottom-4 end-4 w-56 bg-background/95 backdrop-blur shadow-lg">
-            <CardHeader className="p-3 pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Info className="h-4 w-4" />
-                {t('دليل الألوان', 'Color Guide')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-3 pt-0">
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t('حسب السنة (الحدود)', 'By Year (Border)')}</p>
-                <div className="grid grid-cols-5 gap-1">
+            ) : (
+              <div className="space-y-8">
+                {/* Years Grid */}
+                <TooltipProvider delayDuration={100}>
                   {[1, 2, 3, 4, 5].map(year => (
-                    <div key={year} className="text-center">
-                      <div 
-                        className="mx-auto h-4 w-4 rounded-sm border-2" 
-                        style={{ borderColor: yearColors[year], backgroundColor: 'transparent' }}
-                      />
-                      <span className="text-[10px] text-muted-foreground">{year}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-muted-foreground">{t('نوع المقرر', 'Course Type')}</p>
-                <div className="space-y-1">
-                  {Object.entries(courseTypeColors).slice(0, 5).map(([prefix, colors]) => (
-                    <div key={prefix} className="flex items-center gap-2 text-xs">
-                      <div 
-                        className="h-3 w-3 rounded-sm" 
-                        style={{ backgroundColor: colors.bg }}
-                      />
-                      <span className="text-muted-foreground">
-                        {isRTL ? colors.label_ar : colors.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+                    <div key={year} className="relative">
+                      {/* Year Header */}
+                      <div className="mb-4 flex items-center gap-3">
+                        <div 
+                          className="flex h-10 w-10 items-center justify-center rounded-full text-white font-bold shadow-lg"
+                          style={{ backgroundColor: yearColors[year] }}
+                        >
+                          {year}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-foreground">
+                            {t(`السنة ${year}`, `Year ${year}`)}
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            {coursesByYear[year]?.length || 0} {t('مقرر', 'courses')} • {coursesByYear[year]?.reduce((s, c) => s + c.credits, 0) || 0} {t('ساعة', 'credits')}
+                          </p>
+                        </div>
+                      </div>
 
-          {/* Stats Badge */}
-          {stats && (
-            <div className="absolute top-4 start-4 flex flex-wrap gap-2">
-              <Badge variant="secondary" className="bg-background/90 backdrop-blur">
-                {stats.totalCourses} {t('مقرر', 'courses')}
-              </Badge>
-              <Badge variant="outline" className="bg-background/90 backdrop-blur">
-                {stats.totalCredits} {t('ساعة', 'credits')}
-              </Badge>
-              <Badge variant="outline" className="bg-background/90 backdrop-blur">
-                {stats.totalEdges} {t('علاقة', 'relations')}
-              </Badge>
+                      {/* Courses Grid */}
+                      <div className="grid grid-cols-11 gap-3">
+                        <AnimatePresence>
+                          {coursesByYear[year]?.map((course, idx) => {
+                            const category = getCourseCategory(course.code);
+                            const colors = categoryColors[category];
+                            const isFiltered = !filteredNodes.has(course.id);
+                            const isHighlighted = highlightedPath.has(course.id);
+                            const hasPrereqs = getPrerequisiteArrows(course.id).length > 0;
+                            
+                            return (
+                              <Tooltip key={course.id}>
+                                <TooltipTrigger asChild>
+                                  <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ 
+                                      opacity: isFiltered ? 0.3 : 1, 
+                                      y: 0,
+                                      scale: isHighlighted ? 1.05 : 1,
+                                    }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    whileHover={{ scale: 1.08, zIndex: 10 }}
+                                    transition={{ duration: 0.2, delay: idx * 0.02 }}
+                                    onClick={() => handleCourseClick(course)}
+                                    className={`
+                                      relative cursor-pointer rounded-lg p-3 border-2 transition-all
+                                      hover:shadow-xl hover:z-10
+                                      ${isHighlighted ? 'ring-2 ring-primary ring-offset-2' : ''}
+                                      ${course.is_bottleneck ? 'ring-2 ring-destructive' : ''}
+                                    `}
+                                    style={{
+                                      backgroundColor: colors.bg,
+                                      borderColor: isHighlighted ? 'hsl(var(--primary))' : colors.border,
+                                    }}
+                                  >
+                                    {/* Prerequisite indicator arrow */}
+                                    {hasPrereqs && (
+                                      <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                                        <ArrowDown className="h-4 w-4 text-muted-foreground" />
+                                      </div>
+                                    )}
+                                    
+                                    {/* Course Code */}
+                                    <div className="text-xs font-mono font-bold text-center mb-1" style={{ color: colors.text }}>
+                                      {course.code}
+                                    </div>
+                                    
+                                    {/* Course Name */}
+                                    <div className="text-[10px] text-center text-foreground/80 line-clamp-2 h-8 overflow-hidden">
+                                      {isRTL ? (course.name_ar || course.name) : course.name}
+                                    </div>
+                                    
+                                    {/* Credits Badge */}
+                                    <div className="mt-2 flex justify-center">
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-background/50 text-muted-foreground">
+                                        {course.credits} {t('س', 'cr')}
+                                      </span>
+                                    </div>
+
+                                    {/* Bottleneck indicator */}
+                                    {course.is_bottleneck && (
+                                      <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive" title="Bottleneck" />
+                                    )}
+                                  </motion.div>
+                                </TooltipTrigger>
+                                <TooltipContent side="bottom" className="max-w-xs">
+                                  <div className="space-y-1">
+                                    <p className="font-bold">{course.code}</p>
+                                    <p>{isRTL ? (course.name_ar || course.name) : course.name}</p>
+                                    <p className="text-muted-foreground">
+                                      {course.credits} {t('ساعات معتمدة', 'credits')} • {t(`السنة ${course.year_level}`, `Year ${course.year_level}`)}
+                                    </p>
+                                    {course.hours_theory && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {course.hours_theory} {t('نظري', 'theory')} + {course.hours_lab || 0} {t('عملي', 'lab')}
+                                      </p>
+                                    )}
+                                    <p className="text-xs mt-1 italic text-primary">
+                                      {t('اضغط لعرض التفاصيل', 'Click for details')}
+                                    </p>
+                                  </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          })}
+                        </AnimatePresence>
+                      </div>
+
+                      {/* Year Separator Line */}
+                      {year < 5 && (
+                        <div className="mt-6 flex items-center gap-4">
+                          <div className="flex-1 border-t border-dashed border-border" />
+                          <ArrowDown className="h-5 w-5 text-muted-foreground" />
+                          <div className="flex-1 border-t border-dashed border-border" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </TooltipProvider>
+              </div>
+            )}
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+
+        {/* Legend - Fixed at bottom */}
+        <div className="border-t border-border bg-background/95 backdrop-blur p-3">
+          <div className="flex flex-wrap items-center justify-center gap-6">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Info className="h-4 w-4" />
+              <span className="font-medium">{t('دليل الألوان:', 'Legend:')}</span>
             </div>
-          )}
-
-          {/* Major Info Card */}
-          {selectedMajorData && graphData?.major && (
-            <Card className="absolute top-4 end-4 w-64 bg-background/95 backdrop-blur shadow-lg">
-              <CardHeader className="p-3 pb-2">
-                <CardTitle className="text-sm">
-                  {isRTL ? selectedMajorData.name : selectedMajorData.name_en}
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  {graphData.major.duration_years} {t('سنوات', 'years')} • {graphData.major.total_credits} {t('ساعة', 'credits')}
-                </CardDescription>
-              </CardHeader>
-            </Card>
-          )}
+            {Object.entries(categoryColors).map(([key, colors]) => (
+              <div key={key} className="flex items-center gap-2">
+                <div 
+                  className="h-4 w-4 rounded border-2"
+                  style={{ backgroundColor: colors.bg, borderColor: colors.border }}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {isRTL ? colors.label_ar : colors.label}
+                </span>
+              </div>
+            ))}
+            <div className="border-l border-border pl-4 flex items-center gap-4">
+              {[1, 2, 3, 4, 5].map(year => (
+                <div key={year} className="flex items-center gap-1">
+                  <div 
+                    className="h-3 w-3 rounded-full"
+                    style={{ backgroundColor: yearColors[year] }}
+                  />
+                  <span className="text-xs text-muted-foreground">{year}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Course Detail Dialog */}
-        <Dialog open={showDialog} onOpenChange={setShowDialog}>
+        <Dialog open={showDialog} onOpenChange={(open) => { setShowDialog(open); if (!open) setHighlightedPath(new Set()); }}>
           <DialogContent className="max-w-lg max-h-[85vh] overflow-hidden flex flex-col">
             {selectedCourse && (
               <>
@@ -659,7 +659,7 @@ export default function KnowledgeGraph() {
                   <DialogTitle className="flex items-center gap-3">
                     <div
                       className="flex h-12 w-12 items-center justify-center rounded-xl text-white shadow-lg"
-                      style={{ backgroundColor: getCourseTypeColor(selectedCourse.code).bg }}
+                      style={{ backgroundColor: yearColors[selectedCourse.year_level] }}
                     >
                       <BookOpen className="h-6 w-6" />
                     </div>
@@ -696,6 +696,11 @@ export default function KnowledgeGraph() {
                           {selectedCourse.hours_lab} {t('عملي', 'lab')}
                         </Badge>
                       )}
+                      {selectedCourse.is_bottleneck && (
+                        <Badge variant="destructive">
+                          {t('مقرر حرج', 'Bottleneck')}
+                        </Badge>
+                      )}
                     </div>
 
                     {/* Prerequisites */}
@@ -714,7 +719,7 @@ export default function KnowledgeGraph() {
                               key={course.id} 
                               variant="outline" 
                               className="text-xs cursor-pointer hover:bg-muted"
-                              style={{ borderColor: getCourseTypeColor(course.code).border }}
+                              style={{ borderColor: yearColors[course.year_level] }}
                             >
                               {course.code}
                             </Badge>
@@ -743,7 +748,7 @@ export default function KnowledgeGraph() {
                               key={course.id} 
                               variant="outline" 
                               className="text-xs cursor-pointer hover:bg-muted"
-                              style={{ borderColor: getCourseTypeColor(course.code).border }}
+                              style={{ borderColor: yearColors[course.year_level] }}
                             >
                               {course.code}
                             </Badge>
