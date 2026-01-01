@@ -11,8 +11,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Upload, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle,
-  Download, RefreshCw, History, FileText, Users, Loader2
+  Download, RefreshCw, History, FileText, Users, Loader2, StopCircle, Trash2
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useStudentDataImport, ImportResult, ImportLog } from '@/hooks/api/useStudentDataImport';
 import { useLanguageStore } from '@/stores/languageStore';
@@ -119,6 +131,8 @@ export function StudentDataImport() {
     }
   };
 
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
@@ -129,8 +143,45 @@ export function StudentDataImport() {
         return <Badge className="bg-red-500/10 text-red-500 border-red-500/20"><XCircle className="w-3 h-3 mr-1" />{t('فشل', 'Failed')}</Badge>;
       case 'processing':
         return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20"><Loader2 className="w-3 h-3 mr-1 animate-spin" />{t('جاري المعالجة', 'Processing')}</Badge>;
+      case 'cancelled':
+        return <Badge className="bg-gray-500/10 text-gray-500 border-gray-500/20"><StopCircle className="w-3 h-3 mr-1" />{t('ملغى', 'Cancelled')}</Badge>;
+      case 'rolled_back':
+        return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20"><Trash2 className="w-3 h-3 mr-1" />{t('تم الحذف', 'Rolled Back')}</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const handleForceCancel = async (logId: string) => {
+    setActionLoadingId(logId);
+    try {
+      const { data, error } = await supabase.functions.invoke('import-student-records', {
+        body: { action: 'force_cancel', importLogId: logId },
+      });
+      if (error) throw error;
+      toast.success(t('تم إلغاء الاستيراد', 'Import cancelled'));
+      loadLogs();
+    } catch (err) {
+      toast.error(t('فشل إلغاء الاستيراد', 'Failed to cancel import'));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleRollback = async (logId: string) => {
+    setActionLoadingId(logId);
+    try {
+      const { data, error } = await supabase.functions.invoke('import-student-records', {
+        body: { action: 'rollback', importLogId: logId },
+      });
+      if (error) throw error;
+      const deleted = data?.deleted || 0;
+      toast.success(t(`تم حذف ${deleted} سجل`, `Deleted ${deleted} records`));
+      loadLogs();
+    } catch (err) {
+      toast.error(t('فشل حذف الاستيراد', 'Rollback failed'));
+    } finally {
+      setActionLoadingId(null);
     }
   };
 
@@ -406,6 +457,7 @@ export function StudentDataImport() {
                         <TableHead className="text-right">{t('نجح', 'Success')}</TableHead>
                         <TableHead className="text-right">{t('فشل', 'Failed')}</TableHead>
                         <TableHead className="text-right">{t('التاريخ', 'Date')}</TableHead>
+                        <TableHead className="text-right">{t('إجراءات', 'Actions')}</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -423,6 +475,60 @@ export function StudentDataImport() {
                               hour: '2-digit',
                               minute: '2-digit',
                             })}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {log.status === 'processing' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleForceCancel(log.id)}
+                                  disabled={actionLoadingId === log.id}
+                                  className="text-yellow-500 border-yellow-500/30 hover:bg-yellow-500/10"
+                                >
+                                  {actionLoadingId === log.id ? (
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <StopCircle className="w-3 h-3" />
+                                  )}
+                                </Button>
+                              )}
+                              {(log.status === 'completed' || log.status === 'completed_with_errors' || log.status === 'cancelled') && (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={actionLoadingId === log.id}
+                                      className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                                    >
+                                      {actionLoadingId === log.id ? (
+                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                      ) : (
+                                        <Trash2 className="w-3 h-3" />
+                                      )}
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>{t('حذف الاستيراد', 'Delete Import')}</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        {t(
+                                          'سيتم حذف جميع السجلات الأكاديمية التي تم إنشاؤها بواسطة هذا الاستيراد. لا يمكن التراجع عن هذا الإجراء.',
+                                          'All academic records created by this import will be deleted. This action cannot be undone.'
+                                        )}
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>{t('إلغاء', 'Cancel')}</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleRollback(log.id)}>
+                                        {t('تأكيد الحذف', 'Confirm Delete')}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
