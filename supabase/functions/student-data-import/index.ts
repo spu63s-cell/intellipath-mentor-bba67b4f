@@ -28,37 +28,48 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
 
 function findColumn(headers: string[], field: string): string | null {
   const mappings = COLUMN_MAPPINGS[field] || [field];
+  const normalizedMappings = mappings.map((m) => m.trim().toLowerCase());
+
   for (const header of headers) {
     const normalizedHeader = header.trim().toLowerCase();
-    for (const mapping of mappings) {
-      if (normalizedHeader === mapping.toLowerCase() || header.includes(mapping)) {
+    for (const mapping of normalizedMappings) {
+      if (normalizedHeader === mapping || normalizedHeader.includes(mapping)) {
         return header;
       }
     }
   }
+
   return null;
 }
 
 function parseCSV(content: string): { headers: string[]; rows: Record<string, string>[] } {
   const cleanContent = content.replace(/^\uFEFF/, '');
   const firstLine = cleanContent.split('\n')[0] || '';
-  const delimiter = firstLine.includes('\t') ? '\t' : ',';
-  
-  const lines = cleanContent.split('\n').filter(line => line.trim());
+
+  const candidates: Array<'\t' | ',' | ';'> = ['\t', ',', ';'];
+  const delimiter = candidates.reduce((best, d) => {
+    const count = firstLine.split(d).length - 1;
+    const bestCount = firstLine.split(best).length - 1;
+    return count > bestCount ? d : best;
+  }, ',' as '\t' | ',' | ';');
+
+  const lines = cleanContent.split('\n').filter((line) => line.trim());
   if (lines.length === 0) return { headers: [], rows: [] };
-  
-  const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+
+  const headers = lines[0].split(delimiter).map((h) => h.trim().replace(/^"|"$/g, ''));
   const rows: Record<string, string>[] = [];
-  
+
   for (let i = 1; i < lines.length; i++) {
-    const values = lines[i].split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
+    const values = lines[i]
+      .split(delimiter)
+      .map((v) => v.trim().replace(/^"|"$/g, ''));
     const row: Record<string, string> = {};
     headers.forEach((header, idx) => {
       row[header] = values[idx] || '';
     });
     rows.push(row);
   }
-  
+
   return { headers, rows };
 }
 
