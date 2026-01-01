@@ -26,6 +26,7 @@ import { useLanguageStore } from '@/stores/languageStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 
 interface FileImportStatus {
   fileName: string;
@@ -73,16 +74,19 @@ export const AcademicRecordsImport = () => {
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [csvContents, setCsvContents] = useState<Map<string, string>>(new Map());
 
-  // Helper function to convert ArrayBuffer to base64 safely (handles large files)
-  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
+  // Convert Excel (xlsx/xls) ArrayBuffer to CSV using SheetJS
+  const excelToCsv = (buffer: ArrayBuffer): string => {
+    const workbook = XLSX.read(buffer, { type: 'array' });
+    const sheetName = workbook.SheetNames?.[0];
+    if (!sheetName) {
+      throw new Error('No sheets found in Excel file');
     }
-    return btoa(binary);
+    const worksheet = workbook.Sheets[sheetName];
+    return XLSX.utils.sheet_to_csv(worksheet, {
+      FS: ',',
+      RS: '\n',
+      blankrows: false,
+    });
   };
 
   // RFC4180 CSV parser for preview
@@ -184,29 +188,30 @@ export const AcademicRecordsImport = () => {
         }]);
         
       } else if (isExcel) {
-        // Handle Excel file - store as base64 for server processing
         setProgressMessage(t('جاري قراءة ملف Excel...', 'Reading Excel file...'));
         setProgress(20);
-        
+
         const arrayBuffer = await selectedFile.arrayBuffer();
-        const base64 = arrayBufferToBase64(arrayBuffer);
+        const csvText = excelToCsv(arrayBuffer);
         const studentId = extractStudentId(selectedFile.name);
-        
-        // Store with special prefix to identify as Excel
-        setCsvContents(new Map([[selectedFile.name, `__XLSX__${base64}`]]));
+
+        setCsvContents(new Map([[selectedFile.name, csvText]]));
         setZipFile(null);
         setSelectedFileName(selectedFile.name);
-        setFileStatuses([{
-          fileName: selectedFile.name,
-          studentId,
-          status: 'pending',
-          recordsCount: 0,
-        }]);
-        
+        setPreviewData(parseCSVPreview(csvText));
+        setFileStatuses([
+          {
+            fileName: selectedFile.name,
+            studentId,
+            status: 'pending',
+            recordsCount: 0,
+          },
+        ]);
+
         setProgress(0);
         setProgressMessage('');
-        toast.success(t('تم تحميل ملف Excel', 'Excel file loaded'));
-        
+        toast.success(t('تم تحويل ملف Excel إلى CSV', 'Excel converted to CSV'));
+
       } else if (isZIP) {
         setProgressMessage(t('جاري فك ضغط الملف...', 'Extracting ZIP file...'));
         setProgress(10);
@@ -234,10 +239,10 @@ export const AcademicRecordsImport = () => {
           const lower = fName.toLowerCase();
           
           if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
-            // Handle Excel file inside ZIP
+            // Convert Excel file inside ZIP to CSV
             const arrayBuffer = await contents.files[fName].async('arraybuffer');
-            const base64 = arrayBufferToBase64(arrayBuffer);
-            newContents.set(fName, `__XLSX__${base64}`);
+            const csvText = excelToCsv(arrayBuffer);
+            newContents.set(fName, csvText);
           } else {
             // CSV/TSV file
             const text = await contents.files[fName].async('text');
@@ -257,16 +262,16 @@ export const AcademicRecordsImport = () => {
         setCsvContents(newContents);
         setFileStatuses(statuses);
 
-        // Preview first CSV file (skip Excel for preview)
-        const firstCsvFile = fileNames.find(f => f.toLowerCase().endsWith('.csv') || f.toLowerCase().endsWith('.tsv'));
-        if (firstCsvFile) {
-          const firstContent = newContents.get(firstCsvFile);
-          if (firstContent && !firstContent.startsWith('__XLSX__')) {
-            setSelectedFileName(firstCsvFile);
+        // Preview first file
+        if (fileNames.length > 0) {
+          const firstFile = fileNames[0];
+          const firstContent = newContents.get(firstFile);
+          if (firstContent) {
+            setSelectedFileName(firstFile);
             setPreviewData(parseCSVPreview(firstContent));
+          } else {
+            setSelectedFileName(firstFile);
           }
-        } else if (fileNames.length > 0) {
-          setSelectedFileName(fileNames[0]);
         }
 
         setProgress(0);
@@ -391,22 +396,13 @@ export const AcademicRecordsImport = () => {
         );
 
         try {
-          // Check if it's an Excel file (stored with __XLSX__ prefix)
-          const isExcel = csvData.startsWith('__XLSX__');
-          const requestBody: Record<string, unknown> = {
-            fileName,
-            importLogId,
-            useFilenameAsStudentId: true,
-          };
-          
-          if (isExcel) {
-            requestBody.xlsxData = csvData.replace('__XLSX__', '');
-          } else {
-            requestBody.csvData = csvData;
-          }
-          
           const { data, error } = await supabase.functions.invoke('import-student-records', {
-            body: requestBody,
+            body: {
+              csvData,
+              fileName,
+              importLogId,
+              useFilenameAsStudentId: true,
+            },
           });
 
           if (error) throw error;
