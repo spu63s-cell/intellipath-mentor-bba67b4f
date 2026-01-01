@@ -235,6 +235,40 @@ serve(async (req) => {
       useFilenameAsStudentId = true,
     } = body;
 
+    // Force-cancel an import log (useful when UI crashed and status is stuck on "processing")
+    if (action === 'force_cancel') {
+      if (!importLogId) {
+        return new Response(JSON.stringify({ error: 'importLogId is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const nowIso = new Date().toISOString();
+
+      const { error: cancelError } = await supabase
+        .from('import_logs')
+        .update({ status: 'cancelled', completed_at: nowIso })
+        .eq('id', importLogId);
+
+      if (cancelError) {
+        console.error('Force cancel: failed to update import log', cancelError);
+        return new Response(JSON.stringify({ error: 'Failed to cancel import log' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      await supabase
+        .from('import_file_logs')
+        .update({ status: 'cancelled', completed_at: nowIso })
+        .eq('import_log_id', importLogId);
+
+      return new Response(JSON.stringify({ success: true, importLogId, status: 'cancelled' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Rollback (delete records created by a specific import)
     if (action === 'rollback') {
       if (!importLogId) {
@@ -285,42 +319,60 @@ serve(async (req) => {
         new Set((fileLogs || []).map((r: any) => String(r.student_id || '').trim()).filter(Boolean))
       );
 
-      if (studentIds.length === 0) {
-        return new Response(JSON.stringify({ success: true, deleted: 0, importLogId }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      let deletedCount = 0;
+
+      // Prefer precise rollback by importLogId stored inside raw_data
+      try {
+        const { data: deletedRowsById, error: deleteByIdError } = await supabase
+          .from('student_academic_records')
+          .delete()
+          .eq('raw_data->>_import_log_id', importLogId)
+          .select('id');
+
+        if (deleteByIdError) {
+          throw deleteByIdError;
+        }
+
+        deletedCount = deletedRowsById?.length || 0;
+      } catch (e) {
+        // Fallback: time-window + student_id list (less precise)
+        if (studentIds.length > 0) {
+          const { data: deletedRows, error: deleteError } = await supabase
+            .from('student_academic_records')
+            .delete()
+            .in('student_id', studentIds)
+            .gte('created_at', startAt)
+            .lte('created_at', endAt)
+            .select('id');
+
+          if (deleteError) {
+            console.error('Rollback: delete error', deleteError);
+            return new Response(JSON.stringify({ error: 'Failed to delete records' }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          deletedCount = deletedRows?.length || 0;
+        }
       }
 
-      const { data: deletedRows, error: deleteError } = await supabase
-        .from('student_academic_records')
-        .delete()
-        .in('student_id', studentIds)
-        .gte('created_at', startAt)
-        .lte('created_at', endAt)
-        .select('id');
-
-      if (deleteError) {
-        console.error('Rollback: delete error', deleteError);
-        return new Response(JSON.stringify({ error: 'Failed to delete records' }), {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      const nowIso = new Date().toISOString();
 
       await supabase
         .from('import_logs')
-        .update({ status: 'rolled_back', completed_at: new Date().toISOString() })
+        .update({ status: 'rolled_back', completed_at: nowIso })
         .eq('id', importLogId);
 
       await supabase
         .from('import_file_logs')
-        .update({ status: 'rolled_back', completed_at: new Date().toISOString() })
+        .update({ status: 'rolled_back', completed_at: nowIso })
         .eq('import_log_id', importLogId);
 
       return new Response(
         JSON.stringify({
           success: true,
-          deleted: deletedRows?.length || 0,
+          deleted: deletedCount,
           importLogId,
           fileName: logRow.file_name,
         }),
