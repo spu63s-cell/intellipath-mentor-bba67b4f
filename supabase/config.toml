@@ -58,3 +58,6 @@ verify_jwt = true
 
 [functions.link-student]
 verify_jwt = false
+
+[functions.neo4j-query]
+verify_jwt = false

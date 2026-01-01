@@ -18,5 +18,6 @@ export { useStudyMaterials } from './useStudyMaterials';
 // Database Service Hooks (Qdrant, Neo4j, Redis simulation)
 export { useVectorSearch } from './useVectorSearch';
 export { useGraphQuery } from './useGraphQuery';
+export { useNeo4jQuery } from './useNeo4jQuery';
 export { useCacheService } from './useCacheService';
 export { useMemoryService } from './useMemoryService';
