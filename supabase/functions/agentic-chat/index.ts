@@ -735,17 +735,16 @@ serve(async (req) => {
     
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.substring(7);
-      // Create user client to verify token
-      const userClient = createClient(SUPABASE_URL!, token, {
-        auth: { persistSession: false },
-        global: { headers: { Authorization: `Bearer ${token}` } }
-      });
       
-      const { data: { user }, error: authError } = await userClient.auth.getUser();
+      // Use service role client with the user's token to verify
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
       
       if (user && !authError) {
+        console.log("User authenticated:", user.id, user.email);
         authenticatedStudent = await getAuthenticatedStudent(supabase, user.id);
         console.log("Authenticated student:", authenticatedStudent?.student_id);
+      } else if (authError) {
+        console.log("Auth error:", authError.message);
       }
     }
 
