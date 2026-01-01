@@ -21,9 +21,8 @@ import {
 } from '@/components/ui/dialog';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
-import { useGraphQuery } from '@/hooks/api/useGraphQuery';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface GraphNode {
@@ -48,10 +47,10 @@ interface GraphEdge {
 interface Major {
   id: string;
   name: string;
-  name_en: string;
-  description?: string;
-  total_credits?: number;
-  duration_years?: number;
+  name_en: string | null;
+  description?: string | null;
+  total_credits?: number | null;
+  duration_years?: number | null;
 }
 
 // Color palette for year levels - vibrant and distinct
@@ -98,45 +97,123 @@ export default function KnowledgeGraph() {
   const [prerequisites, setPrerequisites] = useState<GraphNode[]>([]);
   const [dependents, setDependents] = useState<GraphNode[]>([]);
   const [viewMode, setViewMode] = useState<'hierarchy' | 'semester'>('hierarchy');
-
-  const { getMajorsList, getMajorGraph, getFullGraph, getPrerequisites, getDependents, isLoading, error } = useGraphQuery();
+  const [isLoading, setIsLoading] = useState(true);
 
   const t = (ar: string, en: string) => isRTL ? ar : en;
 
-  // Load majors list on mount
+  // Load majors list from Supabase
   useEffect(() => {
     const loadMajors = async () => {
-      const result = await getMajorsList();
-      if (result?.majors) {
-        setMajors(result.majors);
-        // Auto-select first major
-        if (result.majors.length > 0 && !selectedMajor) {
-          setSelectedMajor(result.majors[0].id);
+      const { data, error } = await supabase
+        .from('majors')
+        .select('*')
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching majors:', error);
+        toast({
+          title: t('خطأ', 'Error'),
+          description: t('فشل في تحميل التخصصات', 'Failed to load majors'),
+          variant: 'destructive'
+        });
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        setMajors(data);
+        if (!selectedMajor) {
+          setSelectedMajor(data[0].id);
         }
       }
     };
     loadMajors();
   }, []);
 
-  // Load graph data when major changes
+  // Load graph data from Supabase when major changes
   useEffect(() => {
     const loadGraph = async () => {
       if (!selectedMajor) {
-        // Load full graph if no major selected
-        const result = await getFullGraph();
-        if (result) {
-          setGraphData({ nodes: result.nodes, edges: result.edges });
-        }
+        setIsLoading(false);
         return;
       }
 
-      const result = await getMajorGraph(selectedMajor);
-      if (result) {
-        setGraphData({ nodes: result.nodes, edges: result.edges, major: result.major || undefined });
+      setIsLoading(true);
+
+      try {
+        // Get the major info
+        const majorData = majors.find(m => m.id === selectedMajor);
+
+        // Get course IDs for this major
+        const { data: courseMajors, error: cmError } = await supabase
+          .from('course_majors')
+          .select('course_id')
+          .eq('major_id', selectedMajor);
+        
+        if (cmError) throw cmError;
+        
+        if (!courseMajors || courseMajors.length === 0) {
+          setGraphData({ nodes: [], edges: [], major: majorData || undefined });
+          setIsLoading(false);
+          return;
+        }
+        
+        const courseIds = courseMajors.map(cm => cm.course_id);
+
+        // Get course details
+        const { data: coursesData, error: cError } = await supabase
+          .from('courses')
+          .select('*')
+          .in('id', courseIds)
+          .eq('is_active', true)
+          .order('year_level')
+          .order('code');
+        
+        if (cError) throw cError;
+
+        // Transform to GraphNode format
+        const nodes: GraphNode[] = (coursesData || []).map(c => ({
+          id: c.id,
+          code: c.code,
+          name: c.name,
+          name_ar: c.name_ar || undefined,
+          credits: c.credits,
+          department: c.department,
+          year_level: c.year_level,
+          semester: c.semester ? parseInt(c.semester) : undefined,
+          hours_theory: c.hours_theory || undefined,
+          hours_lab: c.hours_lab || undefined,
+        }));
+
+        // Get prerequisites for these courses
+        const { data: prereqData, error: pError } = await supabase
+          .from('course_prerequisites')
+          .select('course_id, prerequisite_id')
+          .in('course_id', courseIds);
+        
+        if (pError) throw pError;
+
+        // Transform to GraphEdge format
+        const edges: GraphEdge[] = (prereqData || []).map(p => ({
+          from: p.prerequisite_id,
+          to: p.course_id,
+          type: 'REQUIRES' as const
+        }));
+
+        setGraphData({ nodes, edges, major: majorData || undefined });
+      } catch (error) {
+        console.error('Error loading graph:', error);
+        toast({
+          title: t('خطأ', 'Error'),
+          description: t('فشل في تحميل البيانات', 'Failed to load data'),
+          variant: 'destructive'
+        });
       }
+
+      setIsLoading(false);
     };
+    
     loadGraph();
-  }, [selectedMajor]);
+  }, [selectedMajor, majors]);
 
   // Calculate course statistics
   const stats = useMemo(() => {
@@ -302,14 +379,58 @@ export default function KnowledgeGraph() {
         if (course) {
           setSelectedCourse(course);
           
-          // Load prerequisites and dependents
-          const [prereqResult, depResult] = await Promise.all([
-            getPrerequisites(course.code),
-            getDependents(course.code)
-          ]);
+          // Load prerequisites from Supabase
+          const { data: prereqIds } = await supabase
+            .from('course_prerequisites')
+            .select('prerequisite_id')
+            .eq('course_id', course.id);
           
-          setPrerequisites(prereqResult?.prerequisites || []);
-          setDependents(depResult?.dependents || []);
+          if (prereqIds && prereqIds.length > 0) {
+            const pIds = prereqIds.map(p => p.prerequisite_id);
+            const { data: prereqCourses } = await supabase
+              .from('courses')
+              .select('*')
+              .in('id', pIds);
+            
+            setPrerequisites((prereqCourses || []).map(c => ({
+              id: c.id,
+              code: c.code,
+              name: c.name,
+              name_ar: c.name_ar || undefined,
+              credits: c.credits,
+              department: c.department,
+              year_level: c.year_level,
+            })));
+          } else {
+            setPrerequisites([]);
+          }
+          
+          // Load dependents from Supabase
+          const { data: depIds } = await supabase
+            .from('course_prerequisites')
+            .select('course_id')
+            .eq('prerequisite_id', course.id);
+          
+          if (depIds && depIds.length > 0) {
+            const dIds = depIds.map(d => d.course_id);
+            const { data: depCourses } = await supabase
+              .from('courses')
+              .select('*')
+              .in('id', dIds);
+            
+            setDependents((depCourses || []).map(c => ({
+              id: c.id,
+              code: c.code,
+              name: c.name,
+              name_ar: c.name_ar || undefined,
+              credits: c.credits,
+              department: c.department,
+              year_level: c.year_level,
+            })));
+          } else {
+            setDependents([]);
+          }
+          
           setShowDialog(true);
         }
       }
