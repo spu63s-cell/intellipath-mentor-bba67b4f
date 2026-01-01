@@ -46,13 +46,47 @@ serve(async (req) => {
 
     let linkedStudent = null;
 
-    // Strategy 1: Link by student_id if provided
+    // Link by student_id if provided
     if (student_id) {
-      const { data: student, error } = await supabase
+      // First check if user already has a linked student record
+      const { data: existingLink } = await supabase
+        .from("students")
+        .select("id, student_id")
+        .eq("user_id", user_id)
+        .maybeSingle();
+
+      if (existingLink && /^\d{7}$/.test(existingLink.student_id)) {
+        // User already linked - cannot change
+        return new Response(
+          JSON.stringify({ 
+            error: "Your account is already linked to a university ID. This cannot be changed.",
+            success: false,
+            linked: true,
+            student_id: existingLink.student_id,
+          }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Check if student_id exists and is available
+      const { data: student } = await supabase
         .from("students")
         .select("id, student_id, user_id")
         .eq("student_id", student_id)
-        .single();
+        .maybeSingle();
+
+      if (student && student.user_id && student.user_id !== user_id) {
+        // Linked to different user - security issue
+        console.log(`Student ${student_id} already linked to different user - access denied`);
+        return new Response(
+          JSON.stringify({ 
+            error: "This student ID is already linked to another account",
+            success: false,
+            linked: false,
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
 
       if (student && !student.user_id) {
         // Student exists and not linked - link them
@@ -63,7 +97,7 @@ serve(async (req) => {
 
         if (!updateError) {
           linkedStudent = student;
-          console.log(`Successfully linked user ${user_id} to student ${student_id}`);
+          console.log(`Successfully linked user ${user_id} to existing student ${student_id}`);
         } else {
           console.error(`Error linking student: ${updateError.message}`);
         }
@@ -71,19 +105,37 @@ serve(async (req) => {
         // Already linked to this user
         linkedStudent = student;
         console.log(`Student ${student_id} already linked to user ${user_id}`);
-      } else if (student && student.user_id) {
-        // Linked to different user - security issue, don't allow
-        console.log(`Student ${student_id} already linked to different user - access denied`);
-        return new Response(
-          JSON.stringify({ 
-            error: "This student ID is already linked to another account",
-            success: false,
-            linked: false,
-          }),
-          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
       } else {
-        console.log(`Student ${student_id} not found in system`);
+        // Student doesn't exist - update existing student record or create one
+        if (existingLink) {
+          // Update existing auto-generated record with real student_id
+          const { error: updateError } = await supabase
+            .from("students")
+            .update({ student_id: student_id })
+            .eq("id", existingLink.id);
+
+          if (!updateError) {
+            linkedStudent = { ...existingLink, student_id };
+            console.log(`Updated user ${user_id} with student_id ${student_id}`);
+          }
+        } else {
+          // Create new student record
+          const { data: newStudent, error: insertError } = await supabase
+            .from("students")
+            .insert({
+              user_id: user_id,
+              student_id: student_id,
+              department: "غير محدد",
+              year_level: 1,
+            })
+            .select()
+            .single();
+
+          if (!insertError && newStudent) {
+            linkedStudent = newStudent;
+            console.log(`Created new student ${student_id} for user ${user_id}`);
+          }
+        }
       }
     }
 
