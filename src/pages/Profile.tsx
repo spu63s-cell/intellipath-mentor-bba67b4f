@@ -9,12 +9,15 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useThemeStore } from '@/stores/themeStore';
 import { useAuthStore } from '@/stores/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { User, Settings, Bell, Shield, Palette, Globe, Save, Camera } from 'lucide-react';
+import { useAcademicRecord } from '@/hooks/useAcademicRecord';
+import { User, Settings, Bell, Shield, Palette, Globe, Save, Camera, GraduationCap, BookOpen, Award, Lock } from 'lucide-react';
 
 export default function Profile() {
   const { language, setLanguage } = useLanguageStore();
@@ -23,6 +26,9 @@ export default function Profile() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const isRTL = language === 'ar';
+
+  // Get academic record data
+  const { studentId, summary, hasAcademicRecord, isLoading: academicLoading } = useAcademicRecord();
 
   const [formData, setFormData] = useState({
     full_name: '',
@@ -166,7 +172,89 @@ export default function Profile() {
           </TabsList>
 
           {/* Profile Tab */}
-          <TabsContent value="profile">
+          <TabsContent value="profile" className="space-y-6">
+            {/* Academic Identity Card - Student ID */}
+            <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <GraduationCap className="h-5 w-5 text-primary" />
+                  {isRTL ? 'الهوية الأكاديمية' : 'Academic Identity'}
+                </CardTitle>
+                <CardDescription>
+                  {isRTL ? 'الرقم الجامعي الخاص بك - لا يمكن تغييره' : 'Your university ID - cannot be changed'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Student ID - Read Only */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    {isRTL ? 'الرقم الجامعي' : 'University ID'}
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      value={studentId || ''}
+                      disabled
+                      className="bg-muted font-mono text-lg font-bold tracking-wider"
+                    />
+                    <Badge className="absolute end-2 top-1/2 -translate-y-1/2 bg-primary/10 text-primary">
+                      {isRTL ? 'ثابت' : 'Fixed'}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {isRTL 
+                      ? 'تم تحديد الرقم الجامعي عند إنشاء الحساب ولا يمكن تغييره'
+                      : 'University ID was set during registration and cannot be changed'}
+                  </p>
+                </div>
+
+                {/* Academic Summary if has records */}
+                {hasAcademicRecord && summary && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t">
+                    <div className="text-center p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">{isRTL ? 'الكلية' : 'College'}</p>
+                      <p className="font-semibold text-sm">{summary.college}</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">{isRTL ? 'التخصص' : 'Major'}</p>
+                      <p className="font-semibold text-sm truncate" title={summary.major}>{summary.major}</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">{isRTL ? 'المعدل التراكمي' : 'GPA'}</p>
+                      <p className="font-bold text-lg text-primary">{summary.cumulativeGPA.toFixed(2)}</p>
+                    </div>
+                    <div className="text-center p-3 rounded-lg bg-muted/50">
+                      <p className="text-xs text-muted-foreground">{isRTL ? 'الساعات المنجزة' : 'Credits'}</p>
+                      <p className="font-bold text-lg">{summary.totalCompletedHours} / 173</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress to Graduation */}
+                {hasAcademicRecord && summary && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-primary" />
+                        {isRTL ? 'التقدم نحو التخرج' : 'Progress to Graduation'}
+                      </span>
+                      <span className="font-bold">{summary.progressPercentage.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={summary.progressPercentage} className="h-3" />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{isRTL ? 'ساعات متبقية:' : 'Remaining:'} {summary.remainingHours}</span>
+                      <span>
+                        {summary.isGraduationEligible 
+                          ? (isRTL ? '✅ مؤهل للتخرج' : '✅ Eligible for Graduation')
+                          : (isRTL ? `⚠️ تحتاج معدل ≥ 2.0 و ${summary.remainingHours} ساعة` : `⚠️ Need GPA ≥ 2.0 & ${summary.remainingHours} more credits`)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Personal Information Card */}
             <Card>
               <CardHeader>
                 <CardTitle>{texts.profile}</CardTitle>
