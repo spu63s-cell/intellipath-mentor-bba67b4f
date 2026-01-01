@@ -16,15 +16,31 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
-    const { user_id, student_id, full_name } = body;
-
-    if (!user_id) {
+    // Get the authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: "user_id is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Missing authorization header", success: false }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Verify the JWT and get the user
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: "Invalid or expired token", success: false }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const body = await req.json();
+    const { student_id, full_name } = body;
+    
+    // Security: User can only link themselves, not other users
+    const user_id = user.id;
 
     console.log(`Attempting to link user ${user_id} with student_id: ${student_id}, name: ${full_name}`);
 
@@ -56,27 +72,18 @@ serve(async (req) => {
         linkedStudent = student;
         console.log(`Student ${student_id} already linked to user ${user_id}`);
       } else if (student && student.user_id) {
-        // Linked to different user
-        console.log(`Student ${student_id} already linked to different user`);
+        // Linked to different user - security issue, don't allow
+        console.log(`Student ${student_id} already linked to different user - access denied`);
+        return new Response(
+          JSON.stringify({ 
+            error: "This student ID is already linked to another account",
+            success: false,
+            linked: false,
+          }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       } else {
         console.log(`Student ${student_id} not found in system`);
-      }
-    }
-
-    // Strategy 2: Try linking by name if student_id didn't work
-    if (!linkedStudent && full_name) {
-      // Find unlinked student with similar name
-      const { data: students } = await supabase
-        .from("students")
-        .select("id, student_id, user_id")
-        .is("user_id", null)
-        .limit(100);
-
-      // Get profiles to compare names
-      if (students && students.length > 0) {
-        // We don't have name in students table, so this is limited
-        // In production, you'd want to add a name field to students
-        console.log(`Found ${students.length} unlinked students, but name matching requires name in students table`);
       }
     }
 
@@ -89,18 +96,13 @@ serve(async (req) => {
         .single();
 
       if (!existingProfile) {
-        // Get user email
-        const { data: { user } } = await supabase.auth.admin.getUserById(user_id);
-        
-        if (user) {
-          await supabase
-            .from("profiles")
-            .insert({
-              user_id: user_id,
-              full_name: full_name,
-              email: user.email || '',
-            });
-        }
+        await supabase
+          .from("profiles")
+          .insert({
+            user_id: user_id,
+            full_name: full_name,
+            email: user.email || '',
+          });
       }
     }
 
