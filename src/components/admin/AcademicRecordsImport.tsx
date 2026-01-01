@@ -73,6 +73,18 @@ export const AcademicRecordsImport = () => {
   const [zipFile, setZipFile] = useState<File | null>(null);
   const [csvContents, setCsvContents] = useState<Map<string, string>>(new Map());
 
+  // Helper function to convert ArrayBuffer to base64 safely (handles large files)
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): string => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return btoa(binary);
+  };
+
   // RFC4180 CSV parser for preview
   const parseCSVPreview = useCallback((text: string): PreviewData => {
     const lines = text.split(/\r?\n/).filter(l => l.trim());
@@ -177,7 +189,7 @@ export const AcademicRecordsImport = () => {
         setProgress(20);
         
         const arrayBuffer = await selectedFile.arrayBuffer();
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+        const base64 = arrayBufferToBase64(arrayBuffer);
         const studentId = extractStudentId(selectedFile.name);
         
         // Store with special prefix to identify as Excel
@@ -224,7 +236,7 @@ export const AcademicRecordsImport = () => {
           if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
             // Handle Excel file inside ZIP
             const arrayBuffer = await contents.files[fName].async('arraybuffer');
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+            const base64 = arrayBufferToBase64(arrayBuffer);
             newContents.set(fName, `__XLSX__${base64}`);
           } else {
             // CSV/TSV file
