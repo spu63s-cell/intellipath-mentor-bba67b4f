@@ -199,11 +199,12 @@ serve(async (req) => {
     console.log('Syncing courses...');
     const courses = await executeNeo4jQuery(driver, `
       MATCH (c:Course)
-      RETURN c.code as code, c.name as name, c.name_ar as name_ar,
-             c.credits as credits, c.department as department, 
-             c.year_level as year_level, c.semester as semester,
+      RETURN c.code as code, c.name_en as name, c.name_ar as name_ar,
+             c.credits as credits, c.category as department, 
+             c.year as year_level, c.level as semester,
              c.hours_theory as hours_theory, c.hours_lab as hours_lab,
-             c.description as description, c.objectives as objectives,
+             c.description_en as description, c.description_ar as description_ar,
+             c.objectives_ar as objectives_ar, c.objectives_en as objectives_en,
              c.is_bottleneck as is_bottleneck, c.critical_path_depth as critical_path_depth
       ORDER BY c.code
     `);
@@ -211,20 +212,27 @@ serve(async (req) => {
     for (const course of courses) {
       if (!course.code || course.code === '-') continue;
       
+      // Parse year from 'year' field (might be number or string)
+      let yearLevel = 1;
+      if (course.year_level) {
+        yearLevel = typeof course.year_level === 'number' ? course.year_level : parseInt(course.year_level) || 1;
+      }
+      
       const { error } = await supabase.from('courses').upsert({
         code: course.code,
         name: course.name || course.name_ar || course.code,
         name_ar: course.name_ar,
         credits: course.credits || 3,
         department: course.department || 'هندسة المعلوماتية',
-        year_level: course.year_level || 1,
-        semester: course.semester,
+        year_level: yearLevel,
+        semester: course.semester?.toString(),
         hours_theory: course.hours_theory || 2,
         hours_lab: course.hours_lab || 2,
         description: course.description,
-        description_ar: course.description,
-        objectives_ar: Array.isArray(course.objectives) ? course.objectives.join('\n') : course.objectives,
-        is_bottleneck: course.is_bottleneck || false,
+        description_ar: course.description_ar,
+        objectives_ar: course.objectives_ar,
+        objectives_en: course.objectives_en,
+        is_bottleneck: course.is_bottleneck === 'True' || course.is_bottleneck === true,
         critical_path_depth: course.critical_path_depth || 0
       }, { onConflict: 'code' });
       if (error) errors.push(`Course ${course.code}: ${error.message}`);
