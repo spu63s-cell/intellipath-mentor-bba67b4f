@@ -17,7 +17,8 @@ import {
   AlertTriangle,
   Brain,
   Shield,
-  Lightbulb
+  Lightbulb,
+  GraduationCap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardGlass, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useStudentDashboard } from '@/hooks/useStudentDashboard';
+import { useAcademicRecord } from '@/hooks/useAcademicRecord';
 import { ExportReportButton } from '@/components/dashboard/ExportReportButton';
 import { useAuthStore } from '@/stores/authStore';
 import { useAcademicAnalysis } from '@/hooks/api/useAcademicAnalysis';
@@ -186,22 +188,33 @@ export default function Dashboard() {
   const { language } = useLanguageStore();
   const { user } = useAuthStore();
   const { student, profile, enrollments, achievements, isLoading, nextLevelXp, xpProgress } = useStudentDashboard();
+  const { studentId, summary, hasAcademicRecord, isLoading: academicLoading } = useAcademicRecord();
   const isRTL = language === 'ar';
 
-  // Default values
+  // Use academic record data if available, otherwise fallback to students table
   const displayData = {
     name: profile?.full_name || (isRTL ? 'طالب جديد' : 'New Student'),
     nameEn: profile?.full_name || 'New Student',
-    department: student?.department || (isRTL ? 'هندسة المعلوماتية' : 'Computer Engineering'),
+    department: summary?.major || student?.department || (isRTL ? 'هندسة المعلوماتية' : 'Computer Engineering'),
+    college: summary?.college || 'كلية الهندسة',
     year: student?.year_level || 1,
-    gpa: student?.gpa || 0,
-    totalCredits: student?.total_credits || 0,
+    // Prefer academic record GPA over students table
+    gpa: hasAcademicRecord && summary ? summary.cumulativeGPA : (student?.gpa || 0),
+    // Prefer academic record credits over students table
+    totalCredits: hasAcademicRecord && summary ? summary.totalCompletedHours : (student?.total_credits || 0),
+    requiredCredits: 173,
+    remainingCredits: hasAcademicRecord && summary ? summary.remainingHours : (173 - (student?.total_credits || 0)),
+    progressPercentage: hasAcademicRecord && summary ? summary.progressPercentage : ((student?.total_credits || 0) / 173 * 100),
     xp: student?.xp_points || 0,
     level: student?.level || 1,
     streak: student?.streak_days || 0,
+    studentId: studentId || student?.student_id || '',
+    isGraduationEligible: hasAcademicRecord && summary ? summary.isGraduationEligible : false,
+    passedCourses: summary?.passedCourses || 0,
+    failedCourses: summary?.failedCourses || 0,
   };
 
-  if (isLoading) {
+  if (isLoading || academicLoading) {
     return (
       <MainLayout>
         <div className="container mx-auto space-y-6 p-4 md:p-6">
@@ -234,14 +247,20 @@ export default function Dashboard() {
               
               <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between relative z-10">
                 <div className="space-y-2">
-                  <p className="text-white/70 text-sm">
-                    {t('dashboard.welcome', { name: '' }).replace(', ', '')}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="secondary" className="bg-white/20 text-white border-0">
+                      <GraduationCap className="h-3 w-3 me-1" />
+                      {displayData.studentId}
+                    </Badge>
+                  </div>
                   <h1 className="text-2xl font-bold md:text-3xl text-white">
                     {displayData.name}
                   </h1>
                   <p className="text-sm text-white/60">
-                    {displayData.department} • {t('years.' + displayData.year)}
+                    {displayData.department}
+                  </p>
+                  <p className="text-xs text-white/50">
+                    {displayData.college}
                   </p>
                 </div>
                 
@@ -249,7 +268,7 @@ export default function Dashboard() {
                   <ExportReportButton
                     student={{
                       name: displayData.name,
-                      studentId: student?.student_id || '',
+                      studentId: displayData.studentId,
                       department: displayData.department,
                       yearLevel: displayData.year,
                       gpa: displayData.gpa,
@@ -267,11 +286,44 @@ export default function Dashboard() {
                   <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/20">
                     <p className="text-xs text-white/60">{t('dashboard.stats.gpa')}</p>
                     <p className="text-2xl font-bold text-white">{displayData.gpa.toFixed(2)}</p>
+                    <p className="text-xs text-white/40">{isRTL ? 'الحد الأدنى 2.0' : 'Min 2.0'}</p>
                   </div>
                   <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/20">
-                    <p className="text-xs text-white/60">{t('dashboard.stats.credits')}</p>
+                    <p className="text-xs text-white/60">{isRTL ? 'الساعات المنجزة' : 'Credits'}</p>
                     <p className="text-2xl font-bold text-white">{displayData.totalCredits}</p>
+                    <p className="text-xs text-white/40">{isRTL ? 'من 173 ساعة' : 'of 173'}</p>
                   </div>
+                  <div className="rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 border border-white/20">
+                    <p className="text-xs text-white/60">{isRTL ? 'المتبقي' : 'Remaining'}</p>
+                    <p className="text-2xl font-bold text-white">{displayData.remainingCredits}</p>
+                    <p className="text-xs text-white/40">{isRTL ? 'ساعة' : 'credits'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Graduation Progress Bar */}
+              <div className="mt-6 relative z-10">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-white/70">{isRTL ? 'التقدم نحو التخرج' : 'Progress to Graduation'}</span>
+                  <span className="text-white font-bold">{displayData.progressPercentage.toFixed(1)}%</span>
+                </div>
+                <div className="h-3 bg-white/20 rounded-full overflow-hidden">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${displayData.progressPercentage}%` }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                    className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full"
+                  />
+                </div>
+                <div className="flex justify-between text-xs mt-1">
+                  <span className="text-white/50">
+                    {displayData.passedCourses} {isRTL ? 'مقرر ناجح' : 'courses passed'}
+                  </span>
+                  <span className={`${displayData.isGraduationEligible ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {displayData.isGraduationEligible 
+                      ? (isRTL ? '✅ مؤهل للتخرج' : '✅ Eligible')
+                      : (isRTL ? '⏳ غير مكتمل' : '⏳ In Progress')}
+                  </span>
                 </div>
               </div>
             </CardContent>
