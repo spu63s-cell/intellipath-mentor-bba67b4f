@@ -6,6 +6,81 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// RFC4180 compliant CSV parser
+function parseCSVRFC4180(csvText: string): { headers: string[]; rows: string[][] } {
+  const lines: string[] = [];
+  let current = '';
+  let inQuotes = false;
+  
+  // Split into lines respecting quoted newlines
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
+    if (char === '"') {
+      if (inQuotes && csvText[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+        current += char;
+      }
+    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && csvText[i + 1] === '\n') i++;
+      if (current.trim()) lines.push(current);
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  if (current.trim()) lines.push(current);
+
+  if (lines.length === 0) return { headers: [], rows: [] };
+
+  // Detect delimiter
+  const firstLine = lines[0];
+  const tabCount = (firstLine.match(/\t/g) || []).length;
+  const semiCount = (firstLine.match(/;/g) || []).length;
+  const commaCount = (firstLine.match(/,/g) || []).length;
+  
+  let delimiter = ',';
+  if (tabCount > commaCount && tabCount > semiCount) delimiter = '\t';
+  else if (semiCount > commaCount) delimiter = ';';
+
+  // Parse row respecting quotes
+  const parseRow = (line: string): string[] => {
+    const values: string[] = [];
+    let val = '';
+    let inQ = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i + 1] === '"') {
+          val += '"';
+          i++;
+        } else {
+          inQ = !inQ;
+        }
+      } else if (c === delimiter && !inQ) {
+        values.push(val.trim());
+        val = '';
+      } else {
+        val += c;
+      }
+    }
+    values.push(val.trim());
+    return values;
+  };
+
+  const headers = parseRow(lines[0]);
+  const rows: string[][] = [];
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseRow(lines[i]);
+    if (row.some(v => v)) rows.push(row);
+  }
+
+  return { headers, rows };
+}
+
 // Flexible column mapping - supports both Arabic and English headers
 const COLUMN_MAPPINGS: Record<string, string[]> = {
   'student_id': ['student_id', 'رقم الطالب', 'الرقم الجامعي', 'رقم_الطالب', 'id', 'studentid'],
@@ -28,7 +103,7 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
   'certificate_score': ['certificate_score', 'علامة الشهادة', 'درجة الشهادة'],
   'certificate_average': ['certificate_average', 'معدل الشهادة'],
   'previous_academic_warning': ['previous_academic_warning', 'الإنذار الاكاديمي السابق'],
-  'course_name': ['course_name', 'اسم المقرر', 'اسم المادة', 'المقرر', 'course', 'name'],
+  'course_name': ['course_name', 'اسم المقرر', 'اسم المادة', 'المقرر', 'course', 'name', '#'],
   'course_code': ['course_code', 'رمز المقرر', 'كود المقرر', 'رقم المقرر', 'code'],
   'course_credits': ['course_credits', 'عدد الساعات', 'الساعات', 'credits', 'hours'],
   'final_grade': ['final_grade', 'العلامة النهائية', 'الدرجة النهائية', 'العلامة', 'grade', 'mark'],
@@ -37,7 +112,7 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
   'has_ministry_scholarship': ['has_ministry_scholarship', 'لديه منحة وزارة', 'منحة'],
 };
 
-function findColumn(headers: string[], field: string): number {
+function findColumnIndex(headers: string[], field: string): number {
   const possibleNames = COLUMN_MAPPINGS[field] || [field];
   for (let i = 0; i < headers.length; i++) {
     const header = headers[i].trim().toLowerCase().replace(/[\s_-]+/g, '');
@@ -49,51 +124,6 @@ function findColumn(headers: string[], field: string): number {
     }
   }
   return -1;
-}
-
-function parseCSV(csvText: string): { headers: string[]; rows: string[][] } {
-  const lines = csvText.trim().split(/\r?\n/);
-  if (lines.length < 1) return { headers: [], rows: [] };
-  
-  // Detect delimiter (comma, semicolon, or tab)
-  const firstLine = lines[0];
-  const delimiter = firstLine.includes(';') ? ';' : firstLine.includes('\t') ? '\t' : ',';
-  
-  const parseRow = (line: string): string[] => {
-    const values: string[] = [];
-    let current = '';
-    let inQuotes = false;
-    
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
-      if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (char === delimiter && !inQuotes) {
-        values.push(current.trim());
-        current = '';
-      } else {
-        current += char;
-      }
-    }
-    values.push(current.trim());
-    return values;
-  };
-  
-  const headers = parseRow(lines[0]);
-  const rows: string[][] = [];
-  
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim();
-    if (!line) continue;
-    rows.push(parseRow(line));
-  }
-  
-  return { headers, rows };
 }
 
 function cleanNumeric(value: string | undefined): number | null {
@@ -109,6 +139,13 @@ function cleanBoolean(value: string | undefined): boolean {
   return lower === 'true' || lower === '1' || lower === 'نعم' || lower === 'yes' || lower === 'صحيح';
 }
 
+// Extract student_id from filename (e.g., "4220212.csv" -> "4220212")
+function extractStudentIdFromFilename(filename: string): string | null {
+  const name = filename.replace(/\\/g, '/').split('/').pop() || '';
+  const match = name.match(/^(\d{5,10})/);
+  return match ? match[1] : null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -117,7 +154,6 @@ serve(async (req) => {
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      console.error('No authorization header');
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -126,34 +162,76 @@ serve(async (req) => {
 
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Parse request body
-    const { csvData, mode = 'full', fileName = 'unknown.csv' } = await req.json();
+    // Verify user is admin
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const { data: roleData } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .single();
+
+    if (!roleData || roleData.role !== "admin") {
+      return new Response(JSON.stringify({ error: 'Admin access required' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Parse request
+    const body = await req.json();
+    const { 
+      csvData, 
+      fileName = 'unknown.csv', 
+      importLogId,
+      useFilenameAsStudentId = true 
+    } = body;
     
     if (!csvData) {
-      console.error('No CSV data provided');
       return new Response(JSON.stringify({ error: 'CSV data is required' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`Starting CSV import from ${fileName}...`);
-    console.log(`CSV data length: ${csvData.length} characters`);
+    // Determine student_id from filename if enabled
+    const filenameStudentId = useFilenameAsStudentId ? extractStudentIdFromFilename(fileName) : null;
     
-    // Parse CSV
-    const { headers, rows } = parseCSV(csvData);
-    console.log(`Parsed ${rows.length} rows with ${headers.length} columns`);
-    console.log(`Headers: ${headers.slice(0, 5).join(', ')}...`);
-    
+    console.log(`Processing file: ${fileName}, extracted student_id: ${filenameStudentId}`);
+
+    // Parse CSV with RFC4180 compliant parser
+    const { headers, rows } = parseCSVRFC4180(csvData);
+    console.log(`Parsed ${rows.length} rows, headers: ${headers.slice(0, 5).join(', ')}...`);
+
     if (rows.length === 0) {
+      // Log file as skipped
+      if (importLogId && filenameStudentId) {
+        await supabase.from('import_file_logs').insert({
+          import_log_id: importLogId,
+          file_name: fileName,
+          student_id: filenameStudentId || 'unknown',
+          status: 'skipped',
+          error_message: 'No valid rows found',
+          completed_at: new Date().toISOString(),
+        });
+      }
+      
       return new Response(JSON.stringify({ 
-        error: 'No valid records found in CSV',
-        message: 'لم يتم العثور على سجلات صالحة في الملف'
+        success: false,
+        error: 'No valid records found',
+        fileName,
+        inserted: 0,
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -161,112 +239,116 @@ serve(async (req) => {
     // Find column indices
     const columnIndices: Record<string, number> = {};
     for (const field of Object.keys(COLUMN_MAPPINGS)) {
-      columnIndices[field] = findColumn(headers, field);
+      columnIndices[field] = findColumnIndex(headers, field);
     }
-    
-    console.log('Column mappings found:', JSON.stringify(
-      Object.fromEntries(
-        Object.entries(columnIndices)
-          .filter(([_, idx]) => idx !== -1)
-          .map(([key, idx]) => [key, headers[idx]])
-      )
-    ));
 
-    // Validate required columns
-    if (columnIndices['student_id'] === -1) {
+    // Process records
+    const records: any[] = [];
+    const getValue = (row: string[], field: string): string => {
+      const idx = columnIndices[field];
+      return idx !== -1 && row[idx] ? row[idx].trim() : '';
+    };
+
+    for (const row of rows) {
+      // Use filename as student_id (priority) or fall back to column
+      let studentId = filenameStudentId || getValue(row, 'student_id');
+      if (!studentId) continue;
+
+      records.push({
+        student_id: studentId,
+        college: getValue(row, 'college') || null,
+        major: getValue(row, 'major') || null,
+        academic_year: getValue(row, 'academic_year') || 'Unknown',
+        semester: getValue(row, 'semester') || 'Unknown',
+        last_registration_semester: getValue(row, 'last_registration_semester') || null,
+        study_mode: getValue(row, 'study_mode') || null,
+        permanent_status: getValue(row, 'permanent_status') || null,
+        semester_status: getValue(row, 'semester_status') || null,
+        registered_hours_semester: cleanNumeric(getValue(row, 'registered_hours_semester')),
+        completed_hours_semester: cleanNumeric(getValue(row, 'completed_hours_semester')),
+        academic_warning: getValue(row, 'academic_warning') || null,
+        previous_academic_warning: getValue(row, 'previous_academic_warning') || null,
+        cumulative_gpa_percent: cleanNumeric(getValue(row, 'cumulative_gpa_percent')),
+        cumulative_gpa_points: cleanNumeric(getValue(row, 'cumulative_gpa_points')),
+        total_completed_hours: cleanNumeric(getValue(row, 'total_completed_hours')),
+        baccalaureate_type: getValue(row, 'baccalaureate_type') || null,
+        baccalaureate_country: getValue(row, 'baccalaureate_country') || null,
+        certificate_score: cleanNumeric(getValue(row, 'certificate_score')),
+        certificate_average: cleanNumeric(getValue(row, 'certificate_average')),
+        has_ministry_scholarship: cleanBoolean(getValue(row, 'has_ministry_scholarship')),
+        course_name: getValue(row, 'course_name') || 'Unknown',
+        course_code: getValue(row, 'course_code') || 'Unknown',
+        course_credits: cleanNumeric(getValue(row, 'course_credits')) || 3,
+        final_grade: cleanNumeric(getValue(row, 'final_grade')),
+        letter_grade: getValue(row, 'letter_grade') || null,
+        grade_points: cleanNumeric(getValue(row, 'grade_points')),
+        raw_data: Object.fromEntries(headers.map((h, idx) => [h, row[idx] || ''])),
+      });
+    }
+
+    if (records.length === 0) {
+      if (importLogId && filenameStudentId) {
+        await supabase.from('import_file_logs').insert({
+          import_log_id: importLogId,
+          file_name: fileName,
+          student_id: filenameStudentId || 'unknown',
+          status: 'skipped',
+          error_message: 'No records with valid student_id',
+          completed_at: new Date().toISOString(),
+        });
+      }
+      
       return new Response(JSON.stringify({ 
-        error: 'Missing required column: student_id',
-        message: 'عمود رقم الطالب مطلوب'
+        success: false,
+        error: 'No records with valid student_id',
+        fileName,
+        inserted: 0,
       }), {
-        status: 400,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Process records in batches
+    // Insert records in batches
     const BATCH_SIZE = 100;
     let inserted = 0;
-    let skipped = 0;
     const errors: string[] = [];
-    const uniqueStudents = new Set<string>();
 
-    for (let i = 0; i < rows.length; i += BATCH_SIZE) {
-      const batch = rows.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < records.length; i += BATCH_SIZE) {
+      const batch = records.slice(i, i + BATCH_SIZE);
+      const { error } = await supabase.from('student_academic_records').insert(batch);
       
-      const batchRecords = batch.map((row, rowIdx) => {
-        const getValue = (field: string): string => {
-          const idx = columnIndices[field];
-          return idx !== -1 && row[idx] ? row[idx].trim() : '';
-        };
-
-        const studentId = getValue('student_id');
-        if (!studentId) {
-          skipped++;
-          return null;
-        }
-        
-        uniqueStudents.add(studentId);
-        
-        return {
-          student_id: studentId,
-          college: getValue('college') || null,
-          major: getValue('major') || null,
-          academic_year: getValue('academic_year') || 'Unknown',
-          semester: getValue('semester') || 'Unknown',
-          last_registration_semester: getValue('last_registration_semester') || null,
-          study_mode: getValue('study_mode') || null,
-          permanent_status: getValue('permanent_status') || null,
-          semester_status: getValue('semester_status') || null,
-          registered_hours_semester: cleanNumeric(getValue('registered_hours_semester')),
-          completed_hours_semester: cleanNumeric(getValue('completed_hours_semester')),
-          academic_warning: getValue('academic_warning') || null,
-          previous_academic_warning: getValue('previous_academic_warning') || null,
-          cumulative_gpa_percent: cleanNumeric(getValue('cumulative_gpa_percent')),
-          cumulative_gpa_points: cleanNumeric(getValue('cumulative_gpa_points')),
-          total_completed_hours: cleanNumeric(getValue('total_completed_hours')),
-          baccalaureate_type: getValue('baccalaureate_type') || null,
-          baccalaureate_country: getValue('baccalaureate_country') || null,
-          certificate_score: cleanNumeric(getValue('certificate_score')),
-          certificate_average: cleanNumeric(getValue('certificate_average')),
-          has_ministry_scholarship: cleanBoolean(getValue('has_ministry_scholarship')),
-          course_name: getValue('course_name') || 'Unknown',
-          course_code: getValue('course_code') || 'Unknown',
-          course_credits: cleanNumeric(getValue('course_credits')) || 3,
-          final_grade: cleanNumeric(getValue('final_grade')),
-          letter_grade: getValue('letter_grade') || null,
-          grade_points: cleanNumeric(getValue('grade_points')),
-          raw_data: Object.fromEntries(headers.map((h, idx) => [h, row[idx] || ''])),
-        };
-      }).filter(record => record !== null);
-
-      if (batchRecords.length === 0) continue;
-
-      const { error } = await supabase
-        .from('student_academic_records')
-        .insert(batchRecords);
-
       if (error) {
-        console.error(`Batch ${Math.floor(i / BATCH_SIZE) + 1} error:`, error);
-        errors.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${error.message}`);
+        console.error(`Batch error:`, error);
+        errors.push(error.message);
       } else {
-        inserted += batchRecords.length;
-        console.log(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: Inserted ${batchRecords.length} records`);
+        inserted += batch.length;
       }
     }
 
-    console.log(`Import completed: ${inserted} records inserted, ${skipped} skipped, ${errors.length} batch errors`);
-    console.log(`Unique students: ${uniqueStudents.size}`);
+    // Log file result
+    const finalStudentId = filenameStudentId || records[0]?.student_id || 'unknown';
+    if (importLogId) {
+      await supabase.from('import_file_logs').insert({
+        import_log_id: importLogId,
+        file_name: fileName,
+        student_id: finalStudentId,
+        status: errors.length > 0 ? 'failed' : 'success',
+        records_count: inserted,
+        error_message: errors.length > 0 ? errors.join('; ') : null,
+        completed_at: new Date().toISOString(),
+      });
+    }
+
+    console.log(`File ${fileName}: inserted ${inserted}/${records.length} records`);
 
     return new Response(JSON.stringify({
       success: errors.length === 0 || inserted > 0,
-      message: inserted > 0 
-        ? `تم استيراد ${inserted} سجل بنجاح`
-        : 'لم يتم استيراد أي سجلات',
-      total_records: rows.length,
-      inserted: inserted,
-      skipped: skipped,
-      unique_students: uniqueStudents.size,
-      errors: errors.length > 0 ? errors.slice(0, 5) : undefined,
+      fileName,
+      studentId: finalStudentId,
+      total_records: records.length,
+      inserted,
+      errors: errors.length > 0 ? errors : undefined,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -275,8 +357,7 @@ serve(async (req) => {
     console.error("Import error:", error);
     return new Response(JSON.stringify({
       success: false,
-      error: error instanceof Error ? error.message : 'An error occurred during import',
-      message: 'حدث خطأ أثناء الاستيراد',
+      error: error instanceof Error ? error.message : 'An error occurred',
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
