@@ -9,23 +9,26 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Upload, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle, 
+import {
+  Upload, FileSpreadsheet, CheckCircle, XCircle, AlertTriangle,
   Download, RefreshCw, History, FileText, Users, Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useStudentDataImport, ImportResult, ImportLog } from '@/hooks/api/useStudentDataImport';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useEffect } from 'react';
 
 export function StudentDataImport() {
   const { t } = useLanguageStore();
-  const { 
-    importCSV, 
-    getImportLogs, 
-    isImporting, 
-    importProgress, 
-    lastResult 
+  const {
+    importCSV,
+    getImportLogs,
+    isImporting,
+    importProgress,
+    lastResult
   } = useStudentDataImport();
+
+  const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024; // 20MB
 
   const [dragActive, setDragActive] = useState(false);
   const [overwrite, setOverwrite] = useState(false);
@@ -44,6 +47,32 @@ export function StudentDataImport() {
     loadLogs();
   }, []);
 
+  const validateSelectedFile = useCallback(
+    (file: File): boolean => {
+      const fileName = file.name.toLowerCase();
+      const isSupported =
+        fileName.endsWith('.csv') || fileName.endsWith('.tsv') || fileName.endsWith('.zip');
+
+      if (!isSupported) {
+        toast.error(t('صيغة الملف غير مدعومة', 'Unsupported file type'));
+        return false;
+      }
+
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        toast.error(
+          t(
+            'حجم الملف أكبر من 20MB. رجاءً قسّم الملف إلى عدة ملفات أصغر.',
+            'File is larger than 20MB. Please split it into smaller files.'
+          )
+        );
+        return false;
+      }
+
+      return true;
+    },
+    [t]
+  );
+
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -54,29 +83,33 @@ export function StudentDataImport() {
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      const fileName = file.name.toLowerCase();
-      if (fileName.endsWith('.csv') || fileName.endsWith('.tsv') || fileName.endsWith('.zip')) {
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        const file = e.dataTransfer.files[0];
+        if (!validateSelectedFile(file)) return;
         setSelectedFile(file);
       }
-    }
-  }, []);
+    },
+    [validateSelectedFile]
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      if (!validateSelectedFile(file)) return;
+      setSelectedFile(file);
     }
   };
 
   const handleImport = async () => {
     if (!selectedFile) return;
-    
+    if (!validateSelectedFile(selectedFile)) return;
+
     try {
       await importCSV(selectedFile, overwrite);
       setSelectedFile(null);

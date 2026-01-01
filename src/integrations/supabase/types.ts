@@ -741,6 +741,48 @@ export type Database = {
         }
         Relationships: []
       }
+      import_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          errors: Json
+          failed_records: number
+          file_name: string
+          file_type: string
+          id: string
+          status: string
+          successful_records: number
+          total_records: number
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          errors?: Json
+          failed_records?: number
+          file_name: string
+          file_type: string
+          id?: string
+          status?: string
+          successful_records?: number
+          total_records?: number
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          errors?: Json
+          failed_records?: number
+          file_name?: string
+          file_type?: string
+          id?: string
+          status?: string
+          successful_records?: number
+          total_records?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       majors: {
         Row: {
           created_at: string
