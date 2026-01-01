@@ -1243,12 +1243,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cleanup_expired_memories: { Args: never; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      upsert_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_request_count?: number
+          p_user_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
