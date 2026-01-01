@@ -1,48 +1,84 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 
-// Priority order: admin > advisor > student
-const getRolePriority = (role: string): number => {
-  switch (role) {
-    case 'admin': return 3;
-    case 'advisor': return 2;
-    case 'student': return 1;
-    default: return 0;
-  }
+// Priority order: admin > advisor > student (higher = more privileges)
+const ROLE_PRIORITY: Record<string, number> = {
+  admin: 100,
+  advisor: 50,
+  student: 10,
 };
 
 const getHighestRole = (roles: { role: string }[]): 'student' | 'advisor' | 'admin' | null => {
   if (!roles || roles.length === 0) return null;
   
-  const sortedRoles = roles.sort((a, b) => getRolePriority(b.role) - getRolePriority(a.role));
-  return sortedRoles[0].role as 'student' | 'advisor' | 'admin';
+  // Find role with highest priority
+  let highestRole: string | null = null;
+  let highestPriority = -1;
+  
+  for (const r of roles) {
+    const priority = ROLE_PRIORITY[r.role] ?? 0;
+    if (priority > highestPriority) {
+      highestPriority = priority;
+      highestRole = r.role;
+    }
+  }
+  
+  return highestRole as 'student' | 'advisor' | 'admin' | null;
+};
+
+const fetchAndSetRole = async (userId: string, setUserRole: (role: 'student' | 'advisor' | 'admin' | null) => void) => {
+  try {
+    const { data: rolesData, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId);
+    
+    if (error) {
+      console.error('Error fetching roles:', error);
+      return;
+    }
+    
+    if (rolesData && rolesData.length > 0) {
+      const highestRole = getHighestRole(rolesData);
+      console.log('User roles:', rolesData, '-> Highest:', highestRole);
+      setUserRole(highestRole);
+    } else {
+      setUserRole(null);
+    }
+  } catch (err) {
+    console.error('Error in fetchAndSetRole:', err);
+  }
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setSession, setIsLoading, setUserRole, reset } = useAuthStore();
+  const { setUser, setSession, setIsLoading, setUserRole } = useAuthStore();
+  const rolesFetchedRef = useRef<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
+        if (!isMounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         
-        // Fetch user roles with setTimeout to prevent deadlock
         if (session?.user) {
-          setTimeout(async () => {
-            const { data: rolesData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', session.user.id);
-            
-            if (rolesData && rolesData.length > 0) {
-              const highestRole = getHighestRole(rolesData);
-              setUserRole(highestRole);
-            }
-          }, 0);
+          // Only fetch roles if we haven't fetched for this user yet
+          if (rolesFetchedRef.current !== session.user.id) {
+            rolesFetchedRef.current = session.user.id;
+            // Use setTimeout to prevent Supabase auth deadlock
+            setTimeout(() => {
+              if (isMounted) {
+                fetchAndSetRole(session.user.id, setUserRole);
+              }
+            }, 0);
+          }
         } else {
+          rolesFetchedRef.current = null;
           setUserRole(null);
         }
         
@@ -51,27 +87,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!isMounted) return;
+      
       setSession(session);
       setUser(session?.user ?? null);
       
-      if (session?.user) {
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id)
-          .then(({ data: rolesData }) => {
-            if (rolesData && rolesData.length > 0) {
-              const highestRole = getHighestRole(rolesData);
-              setUserRole(highestRole);
-            }
-          });
+      if (session?.user && rolesFetchedRef.current !== session.user.id) {
+        rolesFetchedRef.current = session.user.id;
+        await fetchAndSetRole(session.user.id, setUserRole);
       }
       
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [setUser, setSession, setIsLoading, setUserRole]);
 
   return <>{children}</>;

@@ -35,6 +35,7 @@ import Analytics from '@/pages/Analytics';
 import StudyMaterials from '@/pages/StudyMaterials';
 import ChatAnalytics from '@/pages/ChatAnalytics';
 import SyncManagement from '@/pages/SyncManagement';
+import StudentSettings from '@/pages/StudentSettings';
 
 const queryClient = new QueryClient();
 
@@ -66,6 +67,7 @@ function AppContent() {
       <Route path="/career" element={<ProtectedRoute><Career /></ProtectedRoute>} />
       <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+      <Route path="/student-settings" element={<ProtectedRoute><StudentSettings /></ProtectedRoute>} />
       <Route path="/learning-style" element={<ProtectedRoute><LearningStyle /></ProtectedRoute>} />
       <Route path="/simulator" element={<ProtectedRoute><DecisionSimulator /></ProtectedRoute>} />
       <Route path="/talent-ledger" element={<ProtectedRoute><TalentLedger /></ProtectedRoute>} />
