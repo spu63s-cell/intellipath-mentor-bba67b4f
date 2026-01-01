@@ -71,7 +71,9 @@ function parseCSVRFC4180(csvText: string): { headers: string[]; rows: string[][]
     return values;
   };
 
-  const headers = parseRow(lines[0]);
+  const headers = parseRow(lines[0]).map((h, idx) =>
+    idx === 0 ? h.replace(/^\uFEFF/, '') : h
+  );
   const rows: string[][] = [];
   for (let i = 1; i < lines.length; i++) {
     const row = parseRow(lines[i]);
@@ -103,7 +105,7 @@ const COLUMN_MAPPINGS: Record<string, string[]> = {
   'certificate_score': ['certificate_score', 'علامة الشهادة', 'درجة الشهادة'],
   'certificate_average': ['certificate_average', 'معدل الشهادة'],
   'previous_academic_warning': ['previous_academic_warning', 'الإنذار الاكاديمي السابق'],
-  'course_name': ['course_name', 'اسم المقرر', 'اسم المادة', 'المقرر', 'course', 'name', '#'],
+  'course_name': ['course_name', 'اسم المقرر', 'اسم المادة', 'المقرر', 'course', 'coursename'],
   'course_code': ['course_code', 'رمز المقرر', 'كود المقرر', 'رقم المقرر', 'code'],
   'course_credits': ['course_credits', 'عدد الساعات', 'الساعات', 'credits', 'hours'],
   'final_grade': ['final_grade', 'العلامة النهائية', 'الدرجة النهائية', 'العلامة', 'grade', 'mark'],
@@ -146,6 +148,31 @@ function extractStudentIdFromFilename(filename: string): string | null {
   return match ? match[1] : null;
 }
 
+function parseSemesterYear(
+  rawSemester: string,
+  rawAcademicYear: string
+): { semester: string; academicYear: string } {
+  const semesterText = (rawSemester || '').replace(/\s+/g, ' ').trim();
+  const yearText = (rawAcademicYear || '').replace(/\s+/g, ' ').trim();
+
+  const yearRegex = /(\d{4}\s*\/\s*\d{4})/;
+  const yearFromYearCol = yearText.match(yearRegex)?.[1] || null;
+  const yearFromSemesterCol = semesterText.match(yearRegex)?.[1] || null;
+
+  const academicYear = (yearFromYearCol || yearFromSemesterCol || '').replace(/\s+/g, '');
+  const semester = (yearFromYearCol
+    ? semesterText
+    : semesterText.replace(yearRegex, '')
+  )
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return {
+    semester: semester || 'Unknown',
+    academicYear: academicYear || 'Unknown',
+  };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -174,15 +201,23 @@ serve(async (req) => {
       });
     }
 
-    // Check if user has admin role (user may have multiple roles)
-    const { data: roleData } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id)
-      .eq("role", "admin")
-      .maybeSingle();
+    // Verify admin role
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .limit(1);
 
-    if (!roleData) {
+    if (rolesError) {
+      console.error('Role lookup error:', rolesError);
+      return new Response(JSON.stringify({ error: 'Role lookup failed' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (!roles || roles.length === 0) {
       console.log(`User ${user.id} does not have admin role`);
       return new Response(JSON.stringify({ error: 'Admin access required' }), {
         status: 403,
@@ -192,13 +227,109 @@ serve(async (req) => {
 
     // Parse request
     const body = await req.json();
-    const { 
-      csvData, 
-      fileName = 'unknown.csv', 
+    const {
+      action = 'import',
+      csvData,
+      fileName = 'unknown.csv',
       importLogId,
-      useFilenameAsStudentId = true 
+      useFilenameAsStudentId = true,
     } = body;
-    
+
+    // Rollback (delete records created by a specific import)
+    if (action === 'rollback') {
+      if (!importLogId) {
+        return new Response(JSON.stringify({ error: 'importLogId is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: logRow, error: logError } = await supabase
+        .from('import_logs')
+        .select('created_at, completed_at, file_name')
+        .eq('id', importLogId)
+        .maybeSingle();
+
+      if (logError) {
+        console.error('Rollback: failed to fetch import log', logError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch import log' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!logRow) {
+        return new Response(JSON.stringify({ error: 'Import log not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const startAt = logRow.created_at;
+      const endAt = logRow.completed_at || new Date().toISOString();
+
+      const { data: fileLogs, error: fileLogsError } = await supabase
+        .from('import_file_logs')
+        .select('student_id')
+        .eq('import_log_id', importLogId);
+
+      if (fileLogsError) {
+        console.error('Rollback: failed to fetch file logs', fileLogsError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch import file logs' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const studentIds = Array.from(
+        new Set((fileLogs || []).map((r: any) => String(r.student_id || '').trim()).filter(Boolean))
+      );
+
+      if (studentIds.length === 0) {
+        return new Response(JSON.stringify({ success: true, deleted: 0, importLogId }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: deletedRows, error: deleteError } = await supabase
+        .from('student_academic_records')
+        .delete()
+        .in('student_id', studentIds)
+        .gte('created_at', startAt)
+        .lte('created_at', endAt)
+        .select('id');
+
+      if (deleteError) {
+        console.error('Rollback: delete error', deleteError);
+        return new Response(JSON.stringify({ error: 'Failed to delete records' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      await supabase
+        .from('import_logs')
+        .update({ status: 'rolled_back', completed_at: new Date().toISOString() })
+        .eq('id', importLogId);
+
+      await supabase
+        .from('import_file_logs')
+        .update({ status: 'rolled_back', completed_at: new Date().toISOString() })
+        .eq('import_log_id', importLogId);
+
+      return new Response(
+        JSON.stringify({
+          success: true,
+          deleted: deletedRows?.length || 0,
+          importLogId,
+          fileName: logRow.file_name,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     if (!csvData) {
       return new Response(JSON.stringify({ error: 'CSV data is required' }), {
         status: 400,
@@ -246,23 +377,57 @@ serve(async (req) => {
     }
 
     // Process records
-    const records: any[] = [];
     const getValue = (row: string[], field: string): string => {
       const idx = columnIndices[field];
       return idx !== -1 && row[idx] ? row[idx].trim() : '';
     };
 
+    const scoreRecord = (r: any): number => {
+      let score = 0;
+      if (r.college) score++;
+      if (r.major) score++;
+      if (r.academic_year && r.academic_year !== 'Unknown') score++;
+      if (r.semester && r.semester !== 'Unknown') score++;
+      if (r.course_code && r.course_code !== 'Unknown') score++;
+      if (r.course_name && r.course_name !== 'Unknown') score++;
+      if (r.final_grade !== null && r.final_grade !== undefined) score++;
+      if (r.letter_grade) score++;
+      if (r.grade_points !== null && r.grade_points !== undefined) score++;
+      return score;
+    };
+
+    const deduped = new Map<string, any>();
+    let duplicatesSkipped = 0;
+
     for (const row of rows) {
       // Use filename as student_id (priority) or fall back to column
-      let studentId = filenameStudentId || getValue(row, 'student_id');
+      const studentId = (filenameStudentId || getValue(row, 'student_id')).trim();
       if (!studentId) continue;
 
-      records.push({
+      const courseCode = getValue(row, 'course_code').trim();
+      const courseName = getValue(row, 'course_name').trim();
+
+      // Skip non-course/summary rows
+      if (!courseCode && !courseName) continue;
+
+      const { semester, academicYear } = parseSemesterYear(
+        getValue(row, 'semester'),
+        getValue(row, 'academic_year')
+      );
+
+      const raw: Record<string, string> = Object.fromEntries(
+        headers.map((h, idx) => [h, row[idx] || ''])
+      );
+      raw._import_log_id = importLogId || '';
+      raw._import_file_name = fileName;
+      raw._imported_at = new Date().toISOString();
+
+      const record = {
         student_id: studentId,
         college: getValue(row, 'college') || null,
         major: getValue(row, 'major') || null,
-        academic_year: getValue(row, 'academic_year') || 'Unknown',
-        semester: getValue(row, 'semester') || 'Unknown',
+        academic_year: academicYear,
+        semester,
         last_registration_semester: getValue(row, 'last_registration_semester') || null,
         study_mode: getValue(row, 'study_mode') || null,
         permanent_status: getValue(row, 'permanent_status') || null,
@@ -279,15 +444,32 @@ serve(async (req) => {
         certificate_score: cleanNumeric(getValue(row, 'certificate_score')),
         certificate_average: cleanNumeric(getValue(row, 'certificate_average')),
         has_ministry_scholarship: cleanBoolean(getValue(row, 'has_ministry_scholarship')),
-        course_name: getValue(row, 'course_name') || 'Unknown',
-        course_code: getValue(row, 'course_code') || 'Unknown',
+        course_name: courseName || 'Unknown',
+        course_code: courseCode || 'Unknown',
         course_credits: cleanNumeric(getValue(row, 'course_credits')) || 3,
         final_grade: cleanNumeric(getValue(row, 'final_grade')),
         letter_grade: getValue(row, 'letter_grade') || null,
         grade_points: cleanNumeric(getValue(row, 'grade_points')),
-        raw_data: Object.fromEntries(headers.map((h, idx) => [h, row[idx] || ''])),
-      });
+        raw_data: raw,
+      };
+
+      const key = `${record.student_id}|${record.academic_year}|${record.semester}|${record.course_code}`;
+      const existing = deduped.get(key);
+
+      if (!existing) {
+        deduped.set(key, record);
+      } else {
+        const existingScore = scoreRecord(existing);
+        const newScore = scoreRecord(record);
+
+        if (newScore > existingScore) {
+          deduped.set(key, record);
+        }
+        duplicatesSkipped++;
+      }
     }
+
+    const records = Array.from(deduped.values());
 
     if (records.length === 0) {
       if (importLogId && filenameStudentId) {
@@ -349,8 +531,10 @@ serve(async (req) => {
       success: errors.length === 0 || inserted > 0,
       fileName,
       studentId: finalStudentId,
+      parsed_rows: rows.length,
       total_records: records.length,
       inserted,
+      duplicates_skipped: duplicatesSkipped,
       errors: errors.length > 0 ? errors : undefined,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
