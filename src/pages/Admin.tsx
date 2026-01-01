@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { StudentDataImport } from '@/components/admin/StudentDataImport';
 import { CourseDataImport } from '@/components/admin/CourseDataImport';
+import { AdvisorAssignments } from '@/components/admin/AdvisorAssignments';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useAdminUsers, useAdminCourses, useSendNotification } from '@/hooks/useAdminData';
 import { toast } from 'sonner';
@@ -242,6 +243,10 @@ const Admin = () => {
                 <BookOpen className="w-4 h-4" />
                 {t('استيراد المقررات', 'Import Courses')}
               </TabsTrigger>
+              <TabsTrigger value="assignments" className="flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                {t('تعيينات المشرفين', 'Advisor Assignments')}
+              </TabsTrigger>
               <TabsTrigger value="settings" className="flex items-center gap-2">
                 <Settings className="w-4 h-4" />
                 {t('الإعدادات', 'Settings')}
@@ -256,6 +261,11 @@ const Admin = () => {
             {/* Import Courses Tab */}
             <TabsContent value="import-courses">
               <CourseDataImport />
+            </TabsContent>
+
+            {/* Advisor Assignments Tab */}
+            <TabsContent value="assignments">
+              <AdvisorAssignments />
             </TabsContent>
 
             {/* Users Tab */}

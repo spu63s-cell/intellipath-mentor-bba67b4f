@@ -1244,6 +1244,7 @@ export type Database = {
     }
     Functions: {
       cleanup_expired_memories: { Args: never; Returns: undefined }
+      get_cleanup_stats: { Args: never; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
