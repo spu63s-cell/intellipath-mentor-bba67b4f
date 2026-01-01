@@ -76,13 +76,10 @@ export function useURAGChat() {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          messages: messages.map(m => ({ role: m.role, content: m.content })).concat([
-            { role: 'user', content: input }
-          ]),
+          question: input, // urag-query expects 'question' not 'messages'
           student_context: options?.studentContext,
           conversation_id: options?.conversationId,
-          use_hybrid_search: options?.useHybridSearch ?? true,
-          use_metadata_filter: options?.useMetadataFilter ?? true,
+          top_k: 5,
         }),
         signal: abortControllerRef.current.signal,
       });
