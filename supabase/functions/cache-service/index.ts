@@ -174,7 +174,10 @@ serve(async (req) => {
           .gte('window_start', windowStart)
           .maybeSingle();
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+          console.error("Rate limit fetch error:", fetchError);
+          throw fetchError;
+        }
 
         if (existing) {
           const currentCount = existing.request_count || 0;
@@ -201,17 +204,55 @@ serve(async (req) => {
           );
         }
 
-        // Create new rate limit record
-        const { error: insertError } = await supabase
-          .from('rate_limits')
-          .insert({
-            user_id,
-            endpoint,
-            request_count: 1,
-            window_start: new Date().toISOString()
+        // Use upsert to handle race conditions - use the RPC function if available
+        try {
+          // Try using the database function first
+          const { error: rpcError } = await supabase.rpc('upsert_rate_limit', {
+            p_user_id: user_id,
+            p_endpoint: endpoint,
+            p_request_count: 1
           });
 
-        if (insertError) throw insertError;
+          if (rpcError) {
+            console.log("RPC not available, using fallback:", rpcError.message);
+            // Fallback: Try insert, if it fails due to constraint, fetch and update
+            const { error: insertError } = await supabase
+              .from('rate_limits')
+              .insert({
+                user_id,
+                endpoint,
+                request_count: 1,
+                window_start: new Date().toISOString()
+              });
+
+            if (insertError) {
+              // Constraint violation - record exists, fetch and update
+              if (insertError.code === '23505') {
+                const { data: existingRecord } = await supabase
+                  .from('rate_limits')
+                  .select('*')
+                  .eq('user_id', user_id)
+                  .eq('endpoint', endpoint)
+                  .maybeSingle();
+
+                if (existingRecord) {
+                  await supabase
+                    .from('rate_limits')
+                    .update({ 
+                      request_count: (existingRecord.request_count || 0) + 1,
+                      window_start: new Date().toISOString()
+                    })
+                    .eq('id', existingRecord.id);
+                }
+              } else {
+                throw insertError;
+              }
+            }
+          }
+        } catch (upsertError) {
+          console.error("Upsert error:", upsertError);
+          // Continue anyway - rate limiting is not critical
+        }
 
         return new Response(
           JSON.stringify({
