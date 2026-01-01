@@ -1,6 +1,5 @@
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
+import neo4j from "https://deno.land/x/neo4j_driver_lite@5.27.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,75 +28,43 @@ async function executeNeo4jQuery(cypher: string, params: Record<string, any> = {
     throw new Error('Neo4j connection details not configured');
   }
 
-  console.log('Original NEO4J_URI:', neo4jUri);
+  console.log('Connecting to Neo4j:', neo4jUri);
 
-  // Handle Neo4j Aura URIs - extract the host properly
-  let httpUri: string;
-  
-  if (neo4jUri.includes('databases.neo4j.io')) {
-    // Already a Neo4j Aura URI
-    httpUri = neo4jUri
-      .replace('neo4j+s://', 'https://')
-      .replace('neo4j://', 'https://')
-      .replace('bolt+s://', 'https://')
-      .replace('bolt://', 'https://');
-  } else if (neo4jUri.includes('.')) {
-    // Might be just the host without protocol
-    httpUri = `https://${neo4jUri.replace(/^(neo4j\+s|neo4j|bolt\+s|bolt):\/\//, '')}`;
-  } else {
-    // Just an instance ID - construct full Aura URL
-    httpUri = `https://${neo4jUri}.databases.neo4j.io`;
-  }
+  // Don't pass encrypted option when using neo4j+s:// protocol
+  // as the URL already specifies encryption
+  const driver = neo4j.driver(
+    neo4jUri,
+    neo4j.auth.basic(neo4jUsername, neo4jPassword)
+  );
 
-  // Ensure protocol is correct
-  if (!httpUri.startsWith('http')) {
-    httpUri = 'https://' + httpUri;
-  }
+  const session = driver.session({ database: 'neo4j' });
 
-  const apiUrl = `${httpUri}/db/neo4j/tx/commit`;
-
-  console.log('Connecting to Neo4j HTTP API:', apiUrl);
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Basic ' + btoa(`${neo4jUsername}:${neo4jPassword}`),
-    },
-    body: JSON.stringify({
-      statements: [{
-        statement: cypher,
-        parameters: params,
-      }],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('Neo4j HTTP error:', response.status, errorText);
-    throw new Error(`Neo4j request failed: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  
-  if (data.errors && data.errors.length > 0) {
-    console.error('Neo4j query errors:', data.errors);
-    return { results: [], errors: data.errors.map((e: any) => e.message) };
-  }
-
-  // Extract results
-  const results: any[] = [];
-  for (const result of data.results) {
-    for (const record of result.data) {
-      const row: Record<string, any> = {};
-      result.columns.forEach((col: string, idx: number) => {
-        row[col] = record.row[idx];
+  try {
+    const result = await session.run(cypher, params);
+    
+    const records = result.records.map(record => {
+      const obj: Record<string, any> = {};
+      const keys = record.keys as string[];
+      keys.forEach((key: string) => {
+        const value = record.get(key);
+        // Handle Neo4j Integer type
+        if (neo4j.isInt(value)) {
+          obj[key] = value.toNumber();
+        } else if (Array.isArray(value)) {
+          obj[key] = value.map(v => neo4j.isInt(v) ? v.toNumber() : v);
+        } else {
+          obj[key] = value;
+        }
       });
-      results.push(row);
-    }
-  }
+      return obj;
+    });
 
-  return { results };
+    console.log(`Query returned ${records.length} records`);
+    return { results: records };
+  } finally {
+    await session.close();
+    await driver.close();
+  }
 }
 
 serve(async (req) => {
@@ -197,7 +164,7 @@ serve(async (req) => {
           ORDER BY c.year_level, c.semester, c.code
         `, { major_id: request.major_id });
 
-        const courseCodes = majorCourses.results.map(c => c.code);
+        const courseCodes = majorCourses.results.map((c: any) => c.code);
 
         const majorPrereqs = await executeNeo4jQuery(`
           MATCH (c1:Course)-[:IS_PREREQUISITE_FOR]->(c2:Course)
@@ -307,8 +274,8 @@ serve(async (req) => {
 
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorDetails = error instanceof Error ? error.toString() : String(error);
-    console.error('Neo4j function error:', error);
+    const errorDetails = error instanceof Error ? error.stack || error.toString() : String(error);
+    console.error('Neo4j function error:', errorMessage, errorDetails);
     return new Response(JSON.stringify({ 
       error: errorMessage,
       details: errorDetails
