@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguageStore } from '@/stores/languageStore';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -20,7 +22,9 @@ import {
   Wrench,
   Tag,
   Link,
-  AlertTriangle
+  AlertTriangle,
+  Timer,
+  Trash2
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -57,6 +61,19 @@ export default function SyncManagement() {
   const [syncing, setSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(0);
   const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null);
+  
+  // Cron job state
+  const [cronEnabled, setCronEnabled] = useState(false);
+  const [cronSchedule, setCronSchedule] = useState('daily');
+  const [runningCleanup, setRunningCleanup] = useState(false);
+  const [lastCleanupResult, setLastCleanupResult] = useState<{
+    success: boolean;
+    memories_cleaned?: number;
+    rate_limits_cleaned?: number;
+    cache_cleaned?: number;
+    executed_at?: string;
+    error?: string;
+  } | null>(null);
 
   // Fetch current data stats
   const fetchStats = async () => {
@@ -178,6 +195,52 @@ export default function SyncManagement() {
     setSyncing(false);
   };
 
+  // Run cleanup job manually
+  const runCleanupJob = async () => {
+    setRunningCleanup(true);
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('cleanup-job');
+
+      if (error) {
+        throw error;
+      }
+
+      setLastCleanupResult({
+        success: true,
+        memories_cleaned: data?.memories?.cleaned || 0,
+        rate_limits_cleaned: data?.rate_limits_cleaned || 0,
+        cache_cleaned: data?.cache_cleaned || 0,
+        executed_at: data?.executed_at || new Date().toISOString()
+      });
+
+      toast({
+        title: isArabic ? 'نجاح' : 'Success',
+        description: isArabic ? 'تم تنظيف البيانات المنتهية بنجاح' : 'Cleanup completed successfully'
+      });
+    } catch (error: any) {
+      setLastCleanupResult({
+        success: false,
+        error: error.message || 'Unknown error',
+        executed_at: new Date().toISOString()
+      });
+
+      toast({
+        title: isArabic ? 'خطأ' : 'Error',
+        description: error.message || (isArabic ? 'فشل في التنظيف' : 'Cleanup failed'),
+        variant: 'destructive'
+      });
+    }
+    
+    setRunningCleanup(false);
+  };
+
+  const cronScheduleOptions = [
+    { value: 'hourly', label: { ar: 'كل ساعة', en: 'Every hour' }, cron: '0 * * * *' },
+    { value: 'daily', label: { ar: 'يومياً', en: 'Daily (midnight)' }, cron: '0 0 * * *' },
+    { value: 'weekly', label: { ar: 'أسبوعياً', en: 'Weekly (Sunday)' }, cron: '0 0 * * 0' }
+  ];
+
   const statCards = [
     { key: 'majors', icon: GraduationCap, label: { ar: 'التخصصات', en: 'Majors' }, color: 'text-purple-500' },
     { key: 'courses', icon: BookOpen, label: { ar: 'المقررات', en: 'Courses' }, color: 'text-blue-500' },
@@ -225,6 +288,118 @@ export default function SyncManagement() {
               : (isArabic ? 'بدء المزامنة' : 'Start Sync')}
           </Button>
         </div>
+
+        {/* Scheduled Cleanup Section */}
+        <Card className="border-primary/20">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Timer className="h-5 w-5 text-primary" />
+              {isArabic ? 'التنظيف المجدول' : 'Scheduled Cleanup'}
+            </CardTitle>
+            <CardDescription>
+              {isArabic 
+                ? 'تنظيف تلقائي للذكريات المنتهية وذاكرة التخزين المؤقت' 
+                : 'Automatic cleanup of expired memories and cache'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center gap-4">
+              <div className="flex items-center gap-3">
+                <Switch 
+                  checked={cronEnabled} 
+                  onCheckedChange={setCronEnabled}
+                  id="cron-enabled"
+                />
+                <label htmlFor="cron-enabled" className="text-sm font-medium cursor-pointer">
+                  {isArabic ? 'تفعيل التنظيف التلقائي' : 'Enable automatic cleanup'}
+                </label>
+              </div>
+              
+              {cronEnabled && (
+                <Select value={cronSchedule} onValueChange={setCronSchedule}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cronScheduleOptions.map(option => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {isArabic ? option.label.ar : option.label.en}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
+              <Button 
+                variant="outline" 
+                onClick={runCleanupJob}
+                disabled={runningCleanup}
+                className="gap-2"
+              >
+                <Trash2 className={`h-4 w-4 ${runningCleanup ? 'animate-pulse' : ''}`} />
+                {runningCleanup 
+                  ? (isArabic ? 'جاري التنظيف...' : 'Cleaning...') 
+                  : (isArabic ? 'تشغيل الآن' : 'Run Now')}
+              </Button>
+            </div>
+
+            {cronEnabled && (
+              <div className="p-3 bg-muted/50 rounded-lg text-sm">
+                <span className="font-medium">{isArabic ? 'جدولة Cron: ' : 'Cron Schedule: '}</span>
+                <code className="bg-background px-2 py-1 rounded">
+                  {cronScheduleOptions.find(o => o.value === cronSchedule)?.cron}
+                </code>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {isArabic 
+                    ? 'ملاحظة: لتفعيل الجدولة، يجب إضافة هذا الأمر في لوحة تحكم قاعدة البيانات باستخدام pg_cron' 
+                    : 'Note: To activate scheduling, add this cron command in your database dashboard using pg_cron'}
+                </p>
+              </div>
+            )}
+
+            {/* Last Cleanup Result */}
+            {lastCleanupResult && (
+              <div className={`p-3 rounded-lg ${lastCleanupResult.success ? 'bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800' : 'bg-destructive/10 border border-destructive/20'}`}>
+                <div className="flex items-start gap-2">
+                  {lastCleanupResult.success ? (
+                    <CheckCircle className="h-4 w-4 text-emerald-500 mt-0.5" />
+                  ) : (
+                    <XCircle className="h-4 w-4 text-destructive mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">
+                      {lastCleanupResult.success 
+                        ? (isArabic ? 'تم التنظيف بنجاح' : 'Cleanup successful')
+                        : (isArabic ? 'فشل التنظيف' : 'Cleanup failed')}
+                    </div>
+                    {lastCleanupResult.success && (
+                      <div className="text-xs text-muted-foreground mt-1 space-x-2 rtl:space-x-reverse">
+                        <Badge variant="outline" className="text-xs">
+                          {isArabic ? 'ذكريات: ' : 'Memories: '}{lastCleanupResult.memories_cleaned}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {isArabic ? 'حدود الطلبات: ' : 'Rate limits: '}{lastCleanupResult.rate_limits_cleaned}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {isArabic ? 'التخزين المؤقت: ' : 'Cache: '}{lastCleanupResult.cache_cleaned}
+                        </Badge>
+                      </div>
+                    )}
+                    {lastCleanupResult.error && (
+                      <div className="text-xs text-destructive mt-1">{lastCleanupResult.error}</div>
+                    )}
+                    {lastCleanupResult.executed_at && (
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(lastCleanupResult.executed_at).toLocaleString(isArabic ? 'ar-SA' : 'en-US')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Sync Progress */}
         {syncing && (
