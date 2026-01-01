@@ -153,6 +153,12 @@ const adminNavItems = [
     icon: Settings,
     url: '/admin',
   },
+  {
+    titleAr: 'مزامنة البيانات',
+    titleEn: 'Data Sync',
+    icon: Users,
+    url: '/sync-management',
+  },
 ];
 
 export function AppSidebar() {

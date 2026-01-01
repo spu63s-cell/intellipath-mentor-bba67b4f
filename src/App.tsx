@@ -34,6 +34,7 @@ import GpaCalculator from '@/pages/GpaCalculator';
 import Analytics from '@/pages/Analytics';
 import StudyMaterials from '@/pages/StudyMaterials';
 import ChatAnalytics from '@/pages/ChatAnalytics';
+import SyncManagement from '@/pages/SyncManagement';
 
 const queryClient = new QueryClient();
 
@@ -79,6 +80,7 @@ function AppContent() {
       <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
       <Route path="/study-materials" element={<ProtectedRoute><StudyMaterials /></ProtectedRoute>} />
       <Route path="/chat-analytics" element={<ProtectedRoute allowedRoles={['advisor', 'admin']}><ChatAnalytics /></ProtectedRoute>} />
+      <Route path="/sync-management" element={<ProtectedRoute allowedRoles={['admin']}><SyncManagement /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
