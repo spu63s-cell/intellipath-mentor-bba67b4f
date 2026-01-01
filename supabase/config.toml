@@ -61,3 +61,6 @@ verify_jwt = false
 
 [functions.neo4j-query]
 verify_jwt = false
+
+[functions.sync-neo4j]
+verify_jwt = false
