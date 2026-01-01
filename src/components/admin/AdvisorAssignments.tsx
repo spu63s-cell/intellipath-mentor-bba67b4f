@@ -45,7 +45,7 @@ export const AdvisorAssignments = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedAdvisor, setSelectedAdvisor] = useState<string>('');
+  const [selectedAdvisor, setSelectedAdvisor] = useState<string>('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [newAssignment, setNewAssignment] = useState({ advisor_id: '', student_id: '' });
 
@@ -189,7 +189,7 @@ export const AdvisorAssignments = () => {
       a.advisor_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.student_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       a.student_code?.includes(searchQuery);
-    const matchesAdvisor = !selectedAdvisor || a.advisor_id === selectedAdvisor;
+    const matchesAdvisor = selectedAdvisor === 'all' || a.advisor_id === selectedAdvisor;
     return matchesSearch && matchesAdvisor;
   });
 
@@ -325,7 +325,7 @@ export const AdvisorAssignments = () => {
                 <SelectValue placeholder={t('جميع المشرفين', 'All Advisors')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">{t('جميع المشرفين', 'All Advisors')}</SelectItem>
+                <SelectItem value="all">{t('جميع المشرفين', 'All Advisors')}</SelectItem>
                 {advisors.map(advisor => (
                   <SelectItem key={advisor.user_id} value={advisor.user_id}>
                     {advisor.full_name}
