@@ -789,11 +789,14 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string
+          duplicates_merged: number
           errors: Json
           failed_records: number
           file_name: string
           file_type: string
           id: string
+          inserted_records: number
+          parsed_rows: number
           status: string
           successful_records: number
           total_records: number
@@ -802,11 +805,14 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           created_at?: string
+          duplicates_merged?: number
           errors?: Json
           failed_records?: number
           file_name: string
           file_type: string
           id?: string
+          inserted_records?: number
+          parsed_rows?: number
           status?: string
           successful_records?: number
           total_records?: number
@@ -815,11 +821,14 @@ export type Database = {
         Update: {
           completed_at?: string | null
           created_at?: string
+          duplicates_merged?: number
           errors?: Json
           failed_records?: number
           file_name?: string
           file_type?: string
           id?: string
+          inserted_records?: number
+          parsed_rows?: number
           status?: string
           successful_records?: number
           total_records?: number
