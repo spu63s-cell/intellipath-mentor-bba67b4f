@@ -178,6 +178,17 @@ export const useStudentDashboard = () => {
   }, [user]);
 
   useEffect(() => {
+    const handler = () => {
+      void fetchDashboardData();
+    };
+
+    window.addEventListener('intellipath:student-linked', handler);
+    return () => {
+      window.removeEventListener('intellipath:student-linked', handler);
+    };
+  }, [user]);
+
+  useEffect(() => {
     if (student) {
       updateStreak();
     }
