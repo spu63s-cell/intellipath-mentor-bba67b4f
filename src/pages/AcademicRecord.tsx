@@ -101,15 +101,17 @@ export default function AcademicRecord() {
   // Filter records
   const filteredRecords = useMemo(() => {
     if (!records) return [];
-    return records.filter(r => {
-      const matchesSearch =
-        !searchQuery ||
-        r.course_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.course_name?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesYear = selectedYear === 'all' || r.academic_year === selectedYear;
-      const matchesSemester = selectedSemester === 'all' || r.semester === selectedSemester;
-      return matchesSearch && matchesYear && matchesSemester;
-    });
+    return records
+      .filter(r => r.course_code !== '__SUMMARY__')
+      .filter(r => {
+        const matchesSearch =
+          !searchQuery ||
+          r.course_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          r.course_name?.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesYear = selectedYear === 'all' || r.academic_year === selectedYear;
+        const matchesSemester = selectedSemester === 'all' || r.semester === selectedSemester;
+        return matchesSearch && matchesYear && matchesSemester;
+      });
   }, [records, searchQuery, selectedYear, selectedSemester]);
 
   // Calculate stats
