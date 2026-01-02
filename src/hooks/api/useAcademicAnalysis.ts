@@ -181,12 +181,22 @@ export function useAcademicAnalysis() {
     yearLevel?: number,
     failedCourses?: number
   ): Promise<RiskAssessment> => {
-    return callAnalysisAPI('get_risk_assessment', {
-      gpa,
-      credits_completed: creditsCompleted,
-      year_level: yearLevel,
-      failed_courses: failedCourses,
-    });
+    // Validate GPA - must be a valid number between 0 and 4
+    const validGpa = typeof gpa === 'number' && !isNaN(gpa) ? Math.max(0, Math.min(4, gpa)) : 0;
+    
+    // Build data object, only including defined values
+    const data: Record<string, number> = { gpa: validGpa };
+    if (typeof creditsCompleted === 'number' && !isNaN(creditsCompleted)) {
+      data.credits_completed = Math.max(0, creditsCompleted);
+    }
+    if (typeof yearLevel === 'number' && !isNaN(yearLevel)) {
+      data.year_level = Math.max(1, Math.min(6, yearLevel));
+    }
+    if (typeof failedCourses === 'number' && !isNaN(failedCourses)) {
+      data.failed_courses = Math.max(0, failedCourses);
+    }
+    
+    return callAnalysisAPI('get_risk_assessment', data);
   }, [callAnalysisAPI]);
 
   // Get critical path to a course
