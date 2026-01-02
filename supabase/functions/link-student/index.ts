@@ -38,6 +38,21 @@ serve(async (req) => {
 
     const body = await req.json();
     const { student_id, full_name } = body;
+
+    // Validate university ID format (7-10 digits)
+    if (student_id && !/^\d{7,10}$/.test(String(student_id))) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: {
+            code: "VALIDATION_ERR_001",
+            message: "Invalid student ID",
+            message_ar: "الرقم الجامعي غير صالح",
+          },
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
     
     // Security: User can only link themselves, not other users
     const user_id = user.id;
@@ -55,7 +70,7 @@ serve(async (req) => {
         .eq("user_id", user_id)
         .maybeSingle();
 
-      if (existingLink && /^\d{7}$/.test(existingLink.student_id)) {
+      if (existingLink && /^\d{7,10}$/.test(existingLink.student_id)) {
         // User already linked - cannot change
         return new Response(
           JSON.stringify({ 

@@ -167,7 +167,11 @@ export function useAcademicRecord() {
   const { user } = useAuthStore();
 
   // First get the student_id from the students table
-  const { data: studentData, isLoading: studentLoading } = useQuery({
+  const {
+    data: studentData,
+    isLoading: studentLoading,
+    refetch: refetchStudent,
+  } = useQuery({
     queryKey: ['student-link', user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -176,7 +180,7 @@ export function useAcademicRecord() {
         .select('id, student_id, department, major, gpa, total_credits, year_level')
         .eq('user_id', user.id)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data;
     },
@@ -185,18 +189,23 @@ export function useAcademicRecord() {
   });
 
   // Fetch academic records from student_academic_records table
-  const { data: records, isLoading: recordsLoading, error, refetch } = useQuery({
+  const {
+    data: records,
+    isLoading: recordsLoading,
+    error,
+    refetch: refetchRecords,
+  } = useQuery({
     queryKey: ['academic-records', studentData?.student_id],
     queryFn: async () => {
       if (!studentData?.student_id) return [];
-      
+
       const { data, error } = await supabase
         .from('student_academic_records')
         .select('*')
         .eq('student_id', studentData.student_id)
         .order('academic_year', { ascending: true })
         .order('semester', { ascending: true });
-      
+
       if (error) throw error;
       return data as AcademicRecord[];
     },
@@ -446,6 +455,10 @@ export function useAcademicRecord() {
     }));
   })() : [];
 
+  const refetchAll = async (): Promise<void> => {
+    await Promise.all([refetchStudent(), refetchRecords()]);
+  };
+
   return {
     // Student data
     studentId: studentData?.student_id || null,
@@ -460,7 +473,7 @@ export function useAcademicRecord() {
     // Status
     isLoading: studentLoading || recordsLoading,
     error,
-    refetch,
+    refetch: refetchAll,
     hasAcademicRecord: records && records.length > 0,
     // Helper functions for other components
     isExcludedFromGPA,

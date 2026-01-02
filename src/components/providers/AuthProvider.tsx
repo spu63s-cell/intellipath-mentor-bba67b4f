@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -53,51 +55,125 @@ const fetchAndSetRole = async (userId: string, setUserRole: (role: 'student' | '
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setSession, setIsLoading, setUserRole } = useAuthStore();
+  const queryClient = useQueryClient();
   const rolesFetchedRef = useRef<string | null>(null);
+  const linkAttemptedRef = useRef<string | null>(null);
+
+  const ensureStudentLinked = async (authUser: User): Promise<void> => {
+    const studentIdMeta = (authUser.user_metadata as any)?.student_id;
+    const fullNameMeta = (authUser.user_metadata as any)?.full_name;
+
+    const normalizedStudentId =
+      typeof studentIdMeta === 'string' || typeof studentIdMeta === 'number'
+        ? String(studentIdMeta)
+        : '';
+
+    // We can only auto-link if we have a valid university ID.
+    if (!/^\d{7,10}$/.test(normalizedStudentId)) return;
+
+    // Avoid repeated auto-link attempts in a single session.
+    if (linkAttemptedRef.current === authUser.id) return;
+    linkAttemptedRef.current = authUser.id;
+
+    try {
+      const { data: existingStudent, error: studentErr } = await supabase
+        .from('students')
+        .select('id, student_id')
+        .eq('user_id', authUser.id)
+        .maybeSingle();
+
+      if (studentErr) {
+        console.warn('Error checking student link:', studentErr);
+      }
+
+      // Already linked to a real university ID.
+      if (existingStudent?.student_id && /^\d{7,10}$/.test(existingStudent.student_id)) {
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('link-student', {
+        body: {
+          student_id: normalizedStudentId,
+          full_name: typeof fullNameMeta === 'string' ? fullNameMeta : '',
+        },
+      });
+
+      if (error) {
+        console.warn('Auto link-student failed:', error);
+        return;
+      }
+
+      if (data?.success) {
+        // Refresh all data that depends on the student link immediately.
+        queryClient.invalidateQueries({ queryKey: ['student-link', authUser.id] });
+        queryClient.invalidateQueries({ queryKey: ['student-settings', authUser.id] });
+        queryClient.invalidateQueries({ queryKey: ['academic-records'] });
+        queryClient.invalidateQueries({ queryKey: ['academic-records-count'] });
+
+        window.dispatchEvent(new CustomEvent('intellipath:student-linked'));
+      }
+    } catch (err) {
+      console.warn('Auto student linking error:', err);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
 
     // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!isMounted) return;
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Only fetch roles if we haven't fetched for this user yet
-          if (rolesFetchedRef.current !== session.user.id) {
-            rolesFetchedRef.current = session.user.id;
-            // Use setTimeout to prevent Supabase auth deadlock
-            setTimeout(() => {
-              if (isMounted) {
-                fetchAndSetRole(session.user.id, setUserRole);
-              }
-            }, 0);
-          }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
+
+      setSession(session);
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        // Only fetch roles if we haven't fetched for this user yet
+        if (rolesFetchedRef.current !== session.user.id) {
+          rolesFetchedRef.current = session.user.id;
+          // Use setTimeout to prevent Supabase auth deadlock
+          setTimeout(() => {
+            if (isMounted) {
+              fetchAndSetRole(session.user.id, setUserRole);
+              void ensureStudentLinked(session.user);
+            }
+          }, 0);
         } else {
-          rolesFetchedRef.current = null;
-          setUserRole(null);
+          // Even if roles are already fetched, ensure linking at least once.
+          setTimeout(() => {
+            if (isMounted) {
+              void ensureStudentLinked(session.user);
+            }
+          }, 0);
         }
-        
-        setIsLoading(false);
+      } else {
+        rolesFetchedRef.current = null;
+        linkAttemptedRef.current = null;
+        setUserRole(null);
       }
-    );
+
+      setIsLoading(false);
+    });
 
     // THEN check for existing session
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!isMounted) return;
-      
+
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user && rolesFetchedRef.current !== session.user.id) {
         rolesFetchedRef.current = session.user.id;
         await fetchAndSetRole(session.user.id, setUserRole);
       }
-      
+
+      if (session?.user) {
+        // No setTimeout here because this runs outside the auth change callback.
+        await ensureStudentLinked(session.user);
+      }
+
       setIsLoading(false);
     });
 
@@ -105,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [setUser, setSession, setIsLoading, setUserRole]);
+  }, [queryClient, setIsLoading, setSession, setUser, setUserRole]);
 
   return <>{children}</>;
 }
