@@ -6,9 +6,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Environment configuration | إعدادات البيئة
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const AI_API_KEY = Deno.env.get("LOVABLE_API_KEY") || Deno.env.get("AI_API_KEY");
+const AI_GATEWAY_URL = Deno.env.get("AI_GATEWAY_URL") || "https://api.openai.com/v1";
 
 interface VectorSearchRequest {
   query: string;
@@ -141,9 +143,9 @@ serve(async (req) => {
       );
     }
 
-    // 3. Use AI for semantic ranking (simulating vector similarity)
-    if (!LOVABLE_API_KEY) {
-      // Fallback: Simple keyword matching
+    // 3. Use AI for semantic ranking (simulating vector similarity) | استخدام الذكاء الاصطناعي للترتيب الدلالي
+    if (!AI_API_KEY) {
+      // Fallback: Simple keyword matching | البديل: المطابقة البسيطة للكلمات المفتاحية
       const queryLower = query.toLowerCase();
       const queryTerms = queryLower.split(/\s+/).filter(t => t.length > 2);
 
@@ -187,7 +189,7 @@ serve(async (req) => {
       );
     }
 
-    // Use AI for semantic ranking
+    // Use AI for semantic ranking | استخدام الذكاء الاصطناعي للترتيب الدلالي
     const rankingPrompt = `You are a document ranking system. Given a query and a list of documents, rank them by relevance.
 
 Query: "${query}"
@@ -200,10 +202,10 @@ Return ONLY a JSON array of the top ${top_k} most relevant document indices with
 
 Consider semantic similarity, not just keyword matching. Return valid JSON only.`;
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch(`${AI_GATEWAY_URL}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

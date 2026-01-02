@@ -6,9 +6,11 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
+// Environment configuration | إعدادات البيئة
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const AI_GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const AI_API_KEY = Deno.env.get("LOVABLE_API_KEY") || Deno.env.get("AI_API_KEY");
+const AI_GATEWAY_URL = Deno.env.get("AI_GATEWAY_URL") || "https://api.openai.com/v1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -121,14 +123,17 @@ serve(async (req) => {
       ? `Department: ${student_context.department || "N/A"}, Year: ${student_context.year_level || "N/A"}, GPA: ${student_context.gpa || "N/A"}`
       : "";
 
-    // Generate AI response
+    // Generate AI response | توليد استجابة الذكاء الاصطناعي
     const systemPrompt = isAr
       ? `أنت "إنتيليباث"، مستشار أكاديمي ذكي. أجب بناءً على السياق المقدم فقط بلغة عربية واضحة.`
       : `You are "IntelliPath", an intelligent academic advisor. Answer based only on the provided context.`;
 
-    const aiResponse = await fetch(AI_GATEWAY_URL, {
+    const aiResponse = await fetch(`${AI_GATEWAY_URL}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        Authorization: `Bearer ${AI_API_KEY}`,
+        "Content-Type": "application/json" 
+      },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [

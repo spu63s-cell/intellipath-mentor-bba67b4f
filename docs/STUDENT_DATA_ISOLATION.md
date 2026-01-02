@@ -323,8 +323,8 @@ const maliciousMessage = "معدلي' OR '1'='1";
                     │
                     ▼
             ┌───────────────┐
-            │  Lovable AI   │
-            │  Gateway      │
+            │  AI Gateway   │
+            │  بوابة AI     │
             └───────┬───────┘
                     │
                     ▼
