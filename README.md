@@ -1,171 +1,161 @@
-# IntelliPath - AI-Powered Academic Advisor | المرشد الأكاديمي الذكي
+# IntelliPath - نظام التوجيه الأكاديمي الذكي
 
 <div align="center">
 
-![IntelliPath Logo](public/pwa-512x512.png)
+**نظام ذكي شامل لتوجيه الطلاب أكاديمياً باستخدام أحدث تقنيات الذكاء الاصطناعي**
 
-**A comprehensive AI-powered Academic Advisory System for Engineering Students**
+*A comprehensive intelligent system for academic guidance using the latest AI technologies*
 
-**نظام إرشاد أكاديمي ذكي شامل لطلاب الهندسة**
-
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18.3-61dafb.svg)](https://reactjs.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.x-38bdf8.svg)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-Latest-3ecf8e.svg)](https://supabase.com/)
+[![License](https://img.shields.io/badge/License-Private-red.svg)](LICENSE)
+[![University](https://img.shields.io/badge/University-SPU-blue.svg)](https://spu.edu.sy)
 
 </div>
 
 ---
 
-## 📋 Overview | نظرة عامة
+## 📋 نظرة عامة | Overview
 
-IntelliPath is an intelligent academic advisory platform that integrates **10 specialized AI subsystems** to provide personalized academic guidance for engineering students.
+IntelliPath هو نظام توجيه أكاديمي ذكي مصمم لمساعدة طلاب كلية الهندسة المعلوماتية في اتخاذ قرارات أكاديمية مستنيرة. يجمع النظام بين تقنيات الذكاء الاصطناعي المتقدمة وتحليل البيانات لتقديم توصيات شخصية لكل طالب.
 
-IntelliPath هو منصة إرشاد أكاديمي ذكية تدمج **10 أنظمة فرعية ذكية متخصصة** لتقديم إرشاد أكاديمي مخصص لطلاب الهندسة.
-
----
-
-## ✨ Features | الميزات
-
-### 🤖 AI Systems | الأنظمة الذكية
-
-| # | System | النظام | Description | الوصف |
-|---|--------|--------|-------------|-------|
-| 1 | **RAG Chat** | المحادثة الذكية | AI-powered Q&A with academic knowledge | أسئلة وأجوبة مدعومة بالذكاء الاصطناعي |
-| 2 | **Knowledge Graph** | الرسم المعرفي | Visual course relationships | علاقات المقررات المرئية |
-| 3 | **Decision Simulator** | محاكي القرارات | What-if academic scenarios | سيناريوهات "ماذا لو" الأكاديمية |
-| 4 | **Career Planner** | مخطط المسار الوظيفي | Career path recommendations | توصيات المسار الوظيفي |
-| 5 | **Early Warning** | الإنذار المبكر | Academic risk detection | كشف المخاطر الأكاديمية |
-| 6 | **Learning Style** | أسلوب التعلم | Personalized learning analysis | تحليل التعلم الشخصي |
-| 7 | **Gamification** | التلعيب | Achievements and rewards | الإنجازات والمكافآت |
-| 8 | **Talent Ledger** | سجل المواهب | Skills tracking | تتبع المهارات |
-| 9 | **Course Fingerprint** | بصمة المقررات | Course analysis | تحليل المقررات |
-| 10 | **Peer Matching** | مطابقة الأقران | Study group formation | تشكيل مجموعات الدراسة |
-
-### 🎯 Core Features | الميزات الأساسية
-
-- ✅ **Bilingual Support** (Arabic/English) | دعم ثنائي اللغة
-- ✅ **Real-time GPA Tracking** | تتبع المعدل التراكمي في الوقت الفعلي
-- ✅ **Academic Records Import** | استيراد السجلات الأكاديمية
-- ✅ **Course Prerequisites Visualization** | تصور المتطلبات المسبقة
-- ✅ **PDF/Excel Export** | تصدير PDF/Excel
-- ✅ **Dark/Light Theme** | السمة الداكنة/الفاتحة
-- ✅ **PWA Support** | دعم تطبيق الويب التقدمي
-- ✅ **Role-based Access** (Student/Advisor/Admin) | وصول قائم على الأدوار
+IntelliPath is an intelligent academic guidance system designed to help Information Technology Engineering students make informed academic decisions. The system combines advanced AI technologies and data analysis to provide personalized recommendations for each student.
 
 ---
 
-## 🛠️ Tech Stack | مكدس التقنيات
+## 🎯 الرؤية والرسالة | Vision & Mission
 
-### Frontend | الواجهة الأمامية
-- **React 18.3** - UI Framework
-- **TypeScript** - Type Safety
-- **Tailwind CSS** - Styling
-- **shadcn/ui** - UI Components
-- **Framer Motion** - Animations
-- **React Query** - Data Fetching
-- **Zustand** - State Management
-- **i18next** - Internationalization
+### الرؤية | Vision
+أن نكون النظام الرائد في توجيه الطلاب أكاديمياً باستخدام الذكاء الاصطناعي والتقنيات الحديثة لتحقيق أفضل النتائج التعليمية.
 
-### Backend | الخادم الخلفي
-- **Supabase** - Backend Platform
-- **PostgreSQL** - Primary Database
-- **Edge Functions** - Serverless Functions
-- **Qdrant** - Vector Database
-- **Neo4j** - Graph Database
+### الرسالة | Mission
+تزويد الطلاب بأدوات ذكية ومعلومات دقيقة لمساعدتهم على اتخاذ قرارات أكاديمية مدروسة.
 
-### AI/ML | الذكاء الاصطناعي
-- **Gemini Pro/Flash** - LLM
-- **RAG Pipeline** - Document Retrieval
+### الأهداف | Goals
+- تحسين تجربة الطالب الأكاديمية
+- تقليل معدلات الرسوب والتعثر الأكاديمي
+- تمكين الطلاب من اتخاذ قرارات مستنيرة
 
 ---
 
-## 🚀 Quick Start | البدء السريع
+## ✨ الميزات الرئيسية | Key Features
 
-### Prerequisites | المتطلبات
+### للطلاب | For Students
+| الميزة | Feature | الوصف | Description |
+|--------|---------|-------|-------------|
+| 🤖 ذكاء اصطناعي متقدم | Advanced AI | نظام RAG متطور للرد على الأسئلة الأكاديمية | Advanced RAG system for academic Q&A |
+| 📊 تتبع التقدم | Progress Tracking | مراقبة شاملة للتقدم الدراسي | Comprehensive academic progress monitoring |
+| 🧭 تخطيط المسار | Path Planning | مساعدة ذكية في تخطيط المسار الدراسي | Smart academic path planning assistance |
+| 🎮 محاكاة القرارات | Decision Simulator | تجربة سيناريوهات مختلفة | Try different academic scenarios |
+| 🏆 نظام الإنجازات | Achievement System | نقاط XP وشارات تحفيزية | XP points and motivational badges |
+| 💼 التخطيط المهني | Career Planning | اكتشاف الفرص المهنية المتاحة | Discover career opportunities |
 
-```bash
-node --version  # v18.x or later
-npm --version   # 9.x or later
-```
-
-### Installation | التثبيت
-
-```bash
-# Clone repository | استنساخ المستودع
-git clone https://github.com/your-org/intellipath.git
-cd intellipath
-
-# Install dependencies | تثبيت التبعيات
-npm install
-
-# Start development server | بدء خادم التطوير
-npm run dev
-```
-
-### Build for Production | البناء للإنتاج
-
-```bash
-npm run build
-npm run preview
-```
+### للمرشدين والمسؤولين | For Advisors & Admins
+| الميزة | Feature | الوصف | Description |
+|--------|---------|-------|-------------|
+| ⚙️ لوحة التحكم | Admin Dashboard | إدارة شاملة للنظام | Comprehensive system management |
+| ⚠️ الإنذار المبكر | Early Warning | تنبيهات للطلاب المعرضين للخطر | Alerts for at-risk students |
+| 📈 التحليلات | Analytics | إحصائيات وتقارير متقدمة | Advanced statistics and reports |
 
 ---
 
-## 📁 Project Structure | هيكل المشروع
+## 🛠️ التقنيات المستخدمة | Tech Stack
+
+### الواجهة الأمامية | Frontend
+- **React 18** - مكتبة واجهات المستخدم | UI Library
+- **TypeScript** - لغة برمجة آمنة النوع | Type-safe Language
+- **Tailwind CSS** - إطار تنسيق حديث | Modern Styling Framework
+- **Framer Motion** - حركات سلسة | Smooth Animations
+- **Zustand** - إدارة الحالة | State Management
+- **React Query** - إدارة البيانات | Data Management
+- **i18next** - دعم اللغات | Internationalization
+
+### الخلفية | Backend
+- **Supabase** - قاعدة البيانات والمصادقة | Database & Authentication
+- **PostgreSQL** - قاعدة بيانات علائقية | Relational Database
+- **Edge Functions** - وظائف سحابية | Serverless Functions
+- **Qdrant** - قاعدة بيانات متجهية | Vector Database
+- **Neo4j** - قاعدة بيانات الرسم البياني | Graph Database
+
+### الذكاء الاصطناعي | AI/ML
+- **RAG Pipeline** - نظام الاسترجاع والتوليد | Retrieval-Augmented Generation
+- **OpenAI Embeddings** - التضمينات | Embeddings Generation
+- **LangChain** - إطار عمل الذكاء الاصطناعي | AI Framework
+
+---
+
+## 📁 هيكل المشروع | Project Structure
 
 ```
 intellipath/
-├── docs/                    # Documentation | التوثيق
-├── public/                  # Static assets | الملفات الثابتة
-├── src/
-│   ├── api/                 # API layer | طبقة الـ API
-│   ├── components/          # React components | مكونات React
-│   ├── hooks/               # Custom hooks | الخطافات المخصصة
-│   ├── i18n/                # Internationalization | التدويل
-│   ├── pages/               # Page components | صفحات التطبيق
-│   ├── stores/              # State management | إدارة الحالة
-│   └── utils/               # Utilities | الأدوات المساعدة
-└── supabase/
-    └── functions/           # Edge functions | الدوال الطرفية
+├── src/                    # الكود المصدري | Source code
+│   ├── api/               # واجهات برمجة التطبيقات | API endpoints
+│   ├── components/        # المكونات | React components
+│   ├── hooks/             # الخطافات | Custom hooks
+│   ├── pages/             # الصفحات | Pages
+│   ├── stores/            # إدارة الحالة | State stores
+│   └── i18n/              # الترجمات | Translations
+├── supabase/
+│   └── functions/         # وظائف Edge | Edge functions
+├── scripts/
+│   └── python/            # سكربتات Python | Python scripts
+├── public/                # الملفات العامة | Public assets
+└── docs/                  # التوثيق | Documentation
 ```
 
 ---
 
-## 📚 Documentation | التوثيق
+## 🔒 الأمان | Security
 
-| Document | الوثيقة | Description |
-|----------|---------|-------------|
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | الهيكل العام | System architecture |
-| [API_REFERENCE.md](docs/API_REFERENCE.md) | مرجع الـ API | API documentation |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | دليل النشر | Deployment guide |
-| [STUDENT_DATA_ISOLATION.md](docs/STUDENT_DATA_ISOLATION.md) | عزل البيانات | Security model |
+- **Row Level Security (RLS)** - عزل بيانات الطلاب | Student data isolation
+- **JWT Authentication** - مصادقة آمنة | Secure authentication
+- **Role-Based Access Control** - التحكم بالصلاحيات | Permission management
 
 ---
 
-## 🔒 Security | الأمان
+## 🌐 دعم اللغات | Language Support
 
-- **Row Level Security (RLS)** - Database-level access control
-- **JWT Authentication** - Secure token-based auth
-- **Data Isolation** - Students can only access their own data
-- **Rate Limiting** - API protection
-
----
-
-## 📄 License | الترخيص
-
-This project is proprietary software. All rights reserved.
-
-هذا المشروع برمجية خاصة. جميع الحقوق محفوظة.
+النظام يدعم اللغتين بالكامل:
+- 🇸🇦 العربية (Arabic) - RTL support
+- 🇺🇸 English (الإنجليزية) - LTR support
 
 ---
 
-## 👥 Team | الفريق
+## 📞 التواصل | Contact
 
-Developed by the IntelliPath Engineering Team.
+**للحصول على معلومات إضافية أو الدعم الفني، يرجى التواصل مع:**
 
-تم التطوير بواسطة فريق هندسة IntelliPath.
+**For additional information or technical support, please contact:**
+
+### المطور | Developer
+**طارق محيسن | Tareq Mhysen**
+- 📧 Email: TAREQ.SYRIA2002@gmail.com
+- 📱 WhatsApp: +963 940 843 133
+- 📸 Instagram: [@tareq_mhysen](https://instagram.com/tareq_mhysen)
+
+### الجامعة | University
+**الجامعة السورية الخاصة | Syrian Private University (SPU)**
+- 🌐 Website: [spu.edu.sy](https://spu.edu.sy)
+- 📍 Damascus, Syria
 
 ---
 
-*Version 2.0.0 | January 2026*
+## 📄 الترخيص | License
+
+هذا المشروع خاص ومحمي بحقوق الملكية الفكرية.
+
+This project is private and protected by intellectual property rights.
+
+---
+
+<div align="center">
+
+**تم التطوير بواسطة طارق محيسن | Developed by Tareq Mhysen**
+
+*مشروع تخرج - بكالوريوس الذكاء الاصطناعي وعلوم البيانات*
+
+*Graduation Project - Bachelor's in AI and Data Science*
+
+**الجامعة السورية الخاصة SPU | Syrian Private University**
+
+© 2025
+
+</div>
