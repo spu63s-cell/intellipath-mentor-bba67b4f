@@ -82,27 +82,6 @@ IntelliPath is an intelligent academic guidance system designed to help Informat
 
 ---
 
-## 📁 هيكل المشروع | Project Structure
-
-```
-intellipath/
-├── src/                    # الكود المصدري | Source code
-│   ├── api/               # واجهات برمجة التطبيقات | API endpoints
-│   ├── components/        # المكونات | React components
-│   ├── hooks/             # الخطافات | Custom hooks
-│   ├── pages/             # الصفحات | Pages
-│   ├── stores/            # إدارة الحالة | State stores
-│   └── i18n/              # الترجمات | Translations
-├── supabase/
-│   └── functions/         # وظائف Edge | Edge functions
-├── scripts/
-│   └── python/            # سكربتات Python | Python scripts
-├── public/                # الملفات العامة | Public assets
-└── docs/                  # التوثيق | Documentation
-```
-
----
-
 ## 🔒 الأمان | Security
 
 - **Row Level Security (RLS)** - عزل بيانات الطلاب | Student data isolation
