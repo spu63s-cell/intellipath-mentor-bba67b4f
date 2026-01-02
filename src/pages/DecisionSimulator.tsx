@@ -42,9 +42,10 @@ const pointsToGrade = (points: number): string => {
 export default function DecisionSimulator() {
   const { language } = useLanguageStore();
   const isRTL = language === 'ar';
-  const { availableCourses, currentGpa, completedCredits, isLoading } = useSimulatorData();
+  const { availableCourses, currentGpa, completedCredits, gpaEligibleHours, equivalencyHours, isLoading } = useSimulatorData();
 
-  const totalRequiredCredits = 132;
+  // 173 hours required for graduation
+  const totalRequiredCredits = 173;
 
   // Simulation state
   const [selectedCourses, setSelectedCourses] = useState<SimulationCourse[]>([]);
@@ -66,16 +67,22 @@ export default function DecisionSimulator() {
     );
   };
 
+  // Calculate new GPA respecting equivalency logic
+  // GPA is calculated ONLY from post-equivalency courses (gpaEligibleHours)
+  // NOT from equivalency hours (P grades don't affect GPA)
   const calculateNewGPA = () => {
-    const currentPoints = currentGpa * completedCredits;
+    // Current GPA points = currentGpa * gpaEligibleHours (not total completed)
+    const currentPoints = currentGpa * gpaEligibleHours;
     const newPoints = selectedCourses.reduce((sum, c) => sum + (c.expectedGrade * c.credits), 0);
     const newCredits = selectedCourses.reduce((sum, c) => sum + c.credits, 0);
-    const totalCredits = completedCredits + newCredits;
-    return totalCredits > 0 ? (currentPoints + newPoints) / totalCredits : 0;
+    // New total GPA-eligible hours (excluding equivalency)
+    const totalGpaCredits = gpaEligibleHours + newCredits;
+    return totalGpaCredits > 0 ? (currentPoints + newPoints) / totalGpaCredits : 0;
   };
 
   const newGPA = calculateNewGPA();
   const gpaChange = newGPA - currentGpa;
+  // Total hours = completed (includes equivalency) + new courses
   const newCompletedCredits = completedCredits + selectedCourses.reduce((sum, c) => sum + c.credits, 0);
   const remainingCredits = totalRequiredCredits - newCompletedCredits;
   const graduationProgress = (newCompletedCredits / totalRequiredCredits) * 100;

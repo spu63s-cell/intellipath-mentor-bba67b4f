@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLanguageStore } from '@/stores/languageStore';
 import { useToast } from '@/hooks/use-toast';
 import { useAcademicAnalysis } from '@/hooks/api/useAcademicAnalysis';
-import { useStudentDashboard } from '@/hooks/useStudentDashboard';
+import { useAcademicRecord } from '@/hooks/useAcademicRecord';
 import { 
   Calculator, Plus, Trash2, TrendingUp, TrendingDown, 
   GraduationCap, Target, Award, RotateCcw, BookOpen, 
@@ -38,14 +38,15 @@ export default function GpaCalculator() {
   const { language } = useLanguageStore();
   const { toast } = useToast();
   const isRTL = language === 'ar';
-  const { student } = useStudentDashboard();
+  const { summary, isLoading: academicLoading } = useAcademicRecord();
   const { isLoading, getRiskAssessment, projectGrades, simulateRetake, calculateGPALocal } = useAcademicAnalysis();
 
   const [courses, setCourses] = useState<Course[]>([
     { id: '1', name: '', credits: 3, grade: 'B+' },
   ]);
-  const [previousGpa, setPreviousGpa] = useState<number>(student?.gpa || 0);
-  const [previousCredits, setPreviousCredits] = useState<number>(student?.total_credits || 0);
+  // Use real data from academic record (post-equivalency GPA)
+  const [previousGpa, setPreviousGpa] = useState<number>(summary?.cumulativeGPA || 0);
+  const [previousCredits, setPreviousCredits] = useState<number>(summary?.postEquivalencyHours || 0);
   const [riskData, setRiskData] = useState<any>(null);
   const [projectionData, setProjectionData] = useState<any>(null);
   const [retakeData, setRetakeData] = useState<any>(null);
@@ -144,8 +145,8 @@ export default function GpaCalculator() {
 
   const resetCalculator = () => {
     setCourses([{ id: '1', name: '', credits: 3, grade: 'B+' }]);
-    setPreviousGpa(student?.gpa || 0);
-    setPreviousCredits(student?.total_credits || 0);
+    setPreviousGpa(summary?.cumulativeGPA || 0);
+    setPreviousCredits(summary?.postEquivalencyHours || 0);
     setRiskData(null);
     setProjectionData(null);
     setRetakeData(null);
@@ -157,7 +158,7 @@ export default function GpaCalculator() {
       const result = await getRiskAssessment(
         cumulativeGpa,
         totalCredits,
-        student?.year_level
+        summary?.semesters?.length || 1
       );
       setRiskData(result);
       toast({

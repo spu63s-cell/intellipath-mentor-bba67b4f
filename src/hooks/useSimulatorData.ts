@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/stores/authStore';
+import { useAcademicRecord } from './useAcademicRecord';
 
 export interface Course {
   id: string;
@@ -16,39 +16,13 @@ export interface Course {
   difficulty_rating: number | null;
 }
 
-export interface StudentEnrollment {
-  id: string;
-  course_id: string;
-  grade: number | null;
-  letter_grade: string | null;
-  status: string;
-  course?: Course;
-}
-
 export function useSimulatorData() {
-  const { user } = useAuthStore();
+  // Get real academic data from the centralized hook
+  const { summary, allCourses, isLoading: academicLoading, studentId } = useAcademicRecord();
 
-  // Fetch student data
-  const { data: studentData, isLoading: studentLoading } = useQuery({
-    queryKey: ['simulator-student', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-
-      const { data, error } = await supabase
-        .from('students')
-        .select('id, gpa, total_credits, department, year_level')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!user?.id,
-  });
-
-  // Fetch available courses
+  // Fetch all available courses
   const { data: courses, isLoading: coursesLoading } = useQuery({
-    queryKey: ['simulator-courses', studentData?.department],
+    queryKey: ['simulator-courses'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('courses')
@@ -62,45 +36,41 @@ export function useSimulatorData() {
     },
   });
 
-  // Fetch completed enrollments
-  const { data: completedEnrollments, isLoading: enrollmentsLoading } = useQuery({
-    queryKey: ['simulator-enrollments', studentData?.id],
-    queryFn: async () => {
-      if (!studentData?.id) return [];
+  // Get courses the student has completed (from academic record)
+  const completedCourseCodes = allCourses
+    .filter(c => c.isPassed)
+    .map(c => c.course_code);
 
-      const { data, error } = await supabase
-        .from('enrollments')
-        .select(`
-          id,
-          course_id,
-          grade,
-          letter_grade,
-          status
-        `)
-        .eq('student_id', studentData.id)
-        .eq('status', 'completed');
+  // Get available courses (not yet taken or failed ones that can be retaken)
+  const availableCourses = courses?.filter(c => 
+    !completedCourseCodes.includes(c.code)
+  ) || [];
 
-      if (error) return [];
-      return data as StudentEnrollment[];
-    },
-    enabled: !!studentData?.id,
-  });
-
-  // Get available courses (not yet enrolled)
-  const completedCourseIds = completedEnrollments?.map(e => e.course_id) || [];
-  const availableCourses = courses?.filter(c => !completedCourseIds.includes(c.id)) || [];
-
-  // Calculate current stats
-  const currentGpa = Number(studentData?.gpa) || 0;
-  const completedCredits = studentData?.total_credits || 0;
+  // Use accurate GPA and credits from academic summary
+  // These are calculated with the equivalency reset logic
+  const currentGpa = summary?.cumulativeGPA || 0;
+  
+  // For GPA calculation, we need the post-equivalency hours (not including P grades)
+  // This is the denominator for the cumulative GPA calculation
+  const gpaEligibleHours = summary?.postEquivalencyHours || 0;
+  
+  // Total completed hours (including P grades equivalency)
+  const completedCredits = summary?.totalCompletedHours || 0;
 
   return {
-    studentData,
+    studentId,
     courses: courses || [],
     availableCourses,
-    completedEnrollments: completedEnrollments || [],
+    completedCourses: allCourses.filter(c => c.isPassed),
+    // Real GPA from academic record (post-equivalency only)
     currentGpa,
+    // Total completed hours (including equivalency)
     completedCredits,
-    isLoading: studentLoading || coursesLoading || enrollmentsLoading,
+    // Hours that count towards GPA calculation
+    gpaEligibleHours,
+    // Equivalency info
+    equivalencyHours: summary?.equivalencyHours || 0,
+    hasEquivalency: summary?.hasEquivalency || false,
+    isLoading: academicLoading || coursesLoading,
   };
 }

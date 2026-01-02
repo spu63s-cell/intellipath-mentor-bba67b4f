@@ -41,6 +41,7 @@ export interface CourseRecord {
   isFailed: boolean;
   isWithdrawn: boolean;
   isPassed: boolean;
+  isEquivalent: boolean; // معادلة - P grade
 }
 
 export interface SemesterSummary {
@@ -50,19 +51,22 @@ export interface SemesterSummary {
   semesterGPA: number;
   semesterCredits: number;
   earnedCredits: number;
+  isEquivalencySemester: boolean; // This semester contains P grades
 }
 
 export interface AcademicSummary {
   studentId: string;
   college: string;
   major: string;
-  // VALID earned hours (excluding P, 60, Failed)
+  // VALID earned hours (after equivalency reset, excluding failed)
   totalCompletedHours: number;
-  // For display: hours from P grades (don't count towards GPA)
-  pGradeHours: number;
+  // Hours from P grades (equivalency base)
+  equivalencyHours: number;
+  // Hours earned AFTER equivalency
+  postEquivalencyHours: number;
   requiredHours: number; // 173 ساعة
   remainingHours: number;
-  // GPA excluding P and 60 grades
+  // GPA (ONLY from post-equivalency courses, excluding P)
   cumulativeGPA: number;
   cumulativePercentage: number;
   // Counts
@@ -70,7 +74,7 @@ export interface AcademicSummary {
   passedCourses: number;
   failedCourses: number;
   withdrawnCourses: number;
-  pGradeCourses: number; // معادلة
+  equivalentCourses: number; // P grades (معادلة)
   // Status
   academicWarning: string | null;
   permanentStatus: string | null;
@@ -78,6 +82,9 @@ export interface AcademicSummary {
   progressPercentage: number;
   // Semesters breakdown
   semesters: SemesterSummary[];
+  // Equivalency info
+  equivalencySemester: string | null; // "2022/2023|الفصل الأول"
+  hasEquivalency: boolean;
 }
 
 // Grade points mapping - Standard 4.0 scale
@@ -90,35 +97,38 @@ const GRADE_POINTS: Record<string, number> = {
 };
 
 /**
- * CRITICAL RULES:
- * 1. P grade (60) = Pass but EXCLUDED from GPA calculation (معادلة من الخطة القديمة)
- * 2. Grade = 60 exactly = Same as P, EXCLUDED from GPA
+ * CRITICAL RULES - EQUIVALENCY RESET LOGIC:
+ * 
+ * 1. P grade (60) = Equivalency courses (معادلة من الخطة القديمة)
+ *    - NOT counted in GPA calculation
+ *    - Hours ARE counted towards graduation
+ *    - Represents a "reset point" - previous semesters are IGNORED
+ * 
+ * 2. When a semester has P grades:
+ *    - ALL courses from PREVIOUS semesters are IGNORED
+ *    - The P grades become the new "base" completed hours
+ *    - Only courses AFTER the equivalency semester contribute to GPA
+ * 
  * 3. Failed courses (F or <50) = NOT counted in earned hours
  * 4. W (Withdrawn) = NOT counted in GPA or earned hours
- * 5. Passing grade = D (50) or above, EXCEPT for P grades which are just pass
+ * 5. Passing grade = D (50) or above
  */
 
-// Grades that pass but are EXCLUDED from GPA calculation
-const EXCLUDED_FROM_GPA_GRADES = ['P', 'W'];
-// Minimum passing grade value (D = 50)
 const MINIMUM_PASSING_GRADE = 50;
 
 function isPassingGrade(letterGrade: string | null, finalGrade: number | null): boolean {
   if (!letterGrade) return false;
   if (letterGrade === 'W' || letterGrade === 'F') return false;
-  if (letterGrade === 'P') return true; // P is passing but excluded from GPA
+  if (letterGrade === 'P') return true; // P is passing (equivalency)
   if (finalGrade !== null && finalGrade < MINIMUM_PASSING_GRADE) return false;
   return true;
 }
 
 function isExcludedFromGPA(letterGrade: string | null, finalGrade: number | null): boolean {
   if (!letterGrade) return true;
-  // P grades are excluded
   if (letterGrade === 'P') return true;
-  // W (withdrawn) is excluded
   if (letterGrade === 'W') return true;
-  // Grade 60 exactly is treated as P (معادلة)
-  if (finalGrade === 60) return true;
+  if (finalGrade === 60) return true; // 60 exactly is treated as P
   return false;
 }
 
@@ -136,6 +146,21 @@ function isPGrade(letterGrade: string | null, finalGrade: number | null): boolea
   if (letterGrade === 'P') return true;
   if (finalGrade === 60) return true;
   return false;
+}
+
+// Sort semesters chronologically
+function sortSemesters(a: { academic_year: string; semester: string }, b: { academic_year: string; semester: string }): number {
+  // Compare years first
+  if (a.academic_year !== b.academic_year) {
+    return a.academic_year.localeCompare(b.academic_year);
+  }
+  // Then compare semesters (الأول < الثاني < الصيفي)
+  const semesterOrder: Record<string, number> = {
+    'الفصل الأول': 1,
+    'الفصل الثاني': 2,
+    'الفصل الصيفي': 3,
+  };
+  return (semesterOrder[a.semester] || 0) - (semesterOrder[b.semester] || 0);
 }
 
 export function useAcademicRecord() {
@@ -156,7 +181,7 @@ export function useAcademicRecord() {
       return data;
     },
     enabled: !!user?.id,
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 1000 * 60 * 5,
   });
 
   // Fetch academic records from student_academic_records table
@@ -169,8 +194,8 @@ export function useAcademicRecord() {
         .from('student_academic_records')
         .select('*')
         .eq('student_id', studentData.student_id)
-        .order('academic_year', { ascending: false })
-        .order('semester', { ascending: false });
+        .order('academic_year', { ascending: true })
+        .order('semester', { ascending: true });
       
       if (error) throw error;
       return data as AcademicRecord[];
@@ -179,21 +204,69 @@ export function useAcademicRecord() {
     staleTime: 1000 * 60 * 5,
   });
 
-  // Calculate academic summary with STRICT rules
+  // Calculate academic summary with EQUIVALENCY RESET LOGIC
   const summary: AcademicSummary | null = records && records.length > 0 ? (() => {
     const REQUIRED_HOURS = 173;
     
-    // Get unique courses (latest record for each course)
-    const courseMap = new Map<string, AcademicRecord>();
+    // Group records by semester
+    const semesterMap = new Map<string, AcademicRecord[]>();
     records.forEach(r => {
-      const existing = courseMap.get(r.course_code);
-      if (!existing) {
-        courseMap.set(r.course_code, r);
+      const key = `${r.academic_year}|${r.semester}`;
+      if (!semesterMap.has(key)) {
+        semesterMap.set(key, []);
       }
+      semesterMap.get(key)!.push(r);
     });
 
+    // Sort semesters chronologically
+    const sortedSemesters = Array.from(semesterMap.keys()).sort((a, b) => {
+      const [yearA, semA] = a.split('|');
+      const [yearB, semB] = b.split('|');
+      return sortSemesters({ academic_year: yearA, semester: semA }, { academic_year: yearB, semester: semB });
+    });
+
+    // Find the EQUIVALENCY SEMESTER (semester with P grades)
+    let equivalencySemesterKey: string | null = null;
+    for (const key of sortedSemesters) {
+      const semesterRecords = semesterMap.get(key)!;
+      const hasPGrades = semesterRecords.some(r => isPGrade(r.letter_grade, r.final_grade));
+      if (hasPGrades) {
+        equivalencySemesterKey = key;
+        break; // Take the first (earliest) equivalency semester
+      }
+    }
+
+    // Calculate equivalency hours (from P grades in equivalency semester)
+    let equivalencyHours = 0;
+    let equivalentCoursesCount = 0;
+    if (equivalencySemesterKey) {
+      const equivalencySemesterRecords = semesterMap.get(equivalencySemesterKey)!;
+      equivalencySemesterRecords.forEach(r => {
+        if (isPGrade(r.letter_grade, r.final_grade)) {
+          equivalencyHours += r.course_credits || 0;
+          equivalentCoursesCount++;
+        }
+      });
+    }
+
+    // Determine which semesters to include in calculations
+    // If there's an equivalency semester, ONLY include courses from that semester onward
+    const semestersToInclude = equivalencySemesterKey
+      ? sortedSemesters.slice(sortedSemesters.indexOf(equivalencySemesterKey))
+      : sortedSemesters;
+
+    // Get unique courses (latest record for each course) from included semesters
+    const courseMap = new Map<string, AcademicRecord>();
+    for (const key of semestersToInclude) {
+      const semesterRecords = semesterMap.get(key)!;
+      semesterRecords.forEach(r => {
+        // Always take the latest record for each course
+        courseMap.set(r.course_code, r);
+      });
+    }
+
     const uniqueCourses = Array.from(courseMap.values());
-    
+
     // Process each course
     const processedCourses: CourseRecord[] = uniqueCourses.map(c => ({
       course_code: c.course_code,
@@ -208,26 +281,26 @@ export function useAcademicRecord() {
       isFailed: isFailed(c.letter_grade, c.final_grade),
       isWithdrawn: isWithdrawn(c.letter_grade),
       isPassed: isPassingGrade(c.letter_grade, c.final_grade),
+      isEquivalent: isPGrade(c.letter_grade, c.final_grade),
     }));
 
     // Separate categories
     const passedCourses = processedCourses.filter(c => c.isPassed && !c.isWithdrawn);
     const failedCourses = processedCourses.filter(c => c.isFailed);
     const withdrawnCourses = processedCourses.filter(c => c.isWithdrawn);
-    const pGradeCourses = processedCourses.filter(c => isPGrade(c.letter_grade, c.final_grade));
-    
-    // Courses that count towards GPA (passed and NOT excluded)
+
+    // Courses that count towards GPA (passed, NOT P grades, NOT withdrawn)
     const gpaEligibleCourses = passedCourses.filter(c => !c.isExcludedFromGPA);
-    
-    // Calculate VALID earned hours (passed courses that are NOT P/60 grades)
-    const validEarnedHours = passedCourses
-      .filter(c => !isPGrade(c.letter_grade, c.final_grade))
+
+    // Calculate post-equivalency earned hours (passed courses that are NOT P grades)
+    const postEquivalencyHours = passedCourses
+      .filter(c => !c.isEquivalent)
       .reduce((sum, c) => sum + c.credits, 0);
-    
-    // P grade hours (don't count towards progress but show separately)
-    const pGradeHours = pGradeCourses.reduce((sum, c) => sum + c.credits, 0);
-    
-    // Calculate GPA (ONLY from courses that are not excluded)
+
+    // Total completed hours = equivalency hours + post-equivalency passed hours
+    const totalCompletedHours = equivalencyHours + postEquivalencyHours;
+
+    // Calculate GPA (ONLY from post-equivalency courses that are not P grades)
     let totalGradePoints = 0;
     let totalCreditsForGPA = 0;
 
@@ -242,21 +315,29 @@ export function useAcademicRecord() {
       : 0;
 
     // Get latest record for metadata
-    const latestRecord = records[0];
+    const latestRecord = records[records.length - 1];
 
-    // Group by semester
-    const semesterMap = new Map<string, CourseRecord[]>();
-    processedCourses.forEach(c => {
-      const key = `${c.academic_year}|${c.semester}`;
-      if (!semesterMap.has(key)) {
-        semesterMap.set(key, []);
-      }
-      semesterMap.get(key)!.push(c);
-    });
-
-    const semesters: SemesterSummary[] = Array.from(semesterMap.entries()).map(([key, courses]) => {
+    // Build semester summaries
+    const semesters: SemesterSummary[] = semestersToInclude.map(key => {
       const [academic_year, semester] = key.split('|');
+      const semesterRecords = semesterMap.get(key)!;
       
+      const courses: CourseRecord[] = semesterRecords.map(c => ({
+        course_code: c.course_code,
+        course_name: c.course_name,
+        credits: c.course_credits || 0,
+        final_grade: c.final_grade,
+        letter_grade: c.letter_grade,
+        grade_points: GRADE_POINTS[c.letter_grade || ''] ?? 0,
+        academic_year: c.academic_year,
+        semester: c.semester,
+        isExcludedFromGPA: isExcludedFromGPA(c.letter_grade, c.final_grade),
+        isFailed: isFailed(c.letter_grade, c.final_grade),
+        isWithdrawn: isWithdrawn(c.letter_grade),
+        isPassed: isPassingGrade(c.letter_grade, c.final_grade),
+        isEquivalent: isPGrade(c.letter_grade, c.final_grade),
+      }));
+
       const gpaEligible = courses.filter(c => c.isPassed && !c.isExcludedFromGPA);
       const semesterGPAPoints = gpaEligible.reduce((sum, c) => sum + (c.grade_points * c.credits), 0);
       const semesterGPACredits = gpaEligible.reduce((sum, c) => sum + c.credits, 0);
@@ -267,46 +348,84 @@ export function useAcademicRecord() {
         courses,
         semesterGPA: semesterGPACredits > 0 ? semesterGPAPoints / semesterGPACredits : 0,
         semesterCredits: courses.reduce((sum, c) => sum + c.credits, 0),
-        earnedCredits: courses.filter(c => c.isPassed && !isPGrade(c.letter_grade, c.final_grade))
+        earnedCredits: courses.filter(c => c.isPassed)
           .reduce((sum, c) => sum + c.credits, 0),
+        isEquivalencySemester: key === equivalencySemesterKey,
       };
     });
 
-    // Progress based on valid earned hours only
-    const progressPercentage = Math.min((validEarnedHours / REQUIRED_HOURS) * 100, 100);
+    // Progress based on total completed hours
+    const progressPercentage = Math.min((totalCompletedHours / REQUIRED_HOURS) * 100, 100);
 
     return {
       studentId: studentData!.student_id,
       college: latestRecord.college || 'كلية الهندسة',
       major: latestRecord.major || studentData?.major || 'غير محدد',
-      totalCompletedHours: validEarnedHours,
-      pGradeHours,
+      totalCompletedHours,
+      equivalencyHours,
+      postEquivalencyHours,
       requiredHours: REQUIRED_HOURS,
-      remainingHours: Math.max(REQUIRED_HOURS - validEarnedHours, 0),
+      remainingHours: Math.max(REQUIRED_HOURS - totalCompletedHours, 0),
       cumulativeGPA: Math.round(cumulativeGPA * 100) / 100,
       cumulativePercentage: (cumulativeGPA / 4.0) * 100,
       coursesCount: uniqueCourses.length,
       passedCourses: passedCourses.length,
       failedCourses: failedCourses.length,
       withdrawnCourses: withdrawnCourses.length,
-      pGradeCourses: pGradeCourses.length,
+      equivalentCourses: equivalentCoursesCount,
       academicWarning: latestRecord.academic_warning,
       permanentStatus: latestRecord.permanent_status,
-      isGraduationEligible: cumulativeGPA >= 2.0 && validEarnedHours >= REQUIRED_HOURS,
+      isGraduationEligible: cumulativeGPA >= 2.0 && totalCompletedHours >= REQUIRED_HOURS,
       progressPercentage,
       semesters,
+      equivalencySemester: equivalencySemesterKey,
+      hasEquivalency: !!equivalencySemesterKey,
     };
   })() : null;
 
   // Get all processed courses for other components
-  const allCourses: CourseRecord[] = records ? (() => {
+  const allCourses: CourseRecord[] = records && summary ? (() => {
+    // Only return courses from the included semesters (post-equivalency)
     const courseMap = new Map<string, AcademicRecord>();
+    
+    // Group by semester first
+    const semesterMap = new Map<string, AcademicRecord[]>();
     records.forEach(r => {
-      const existing = courseMap.get(r.course_code);
-      if (!existing) {
-        courseMap.set(r.course_code, r);
+      const key = `${r.academic_year}|${r.semester}`;
+      if (!semesterMap.has(key)) {
+        semesterMap.set(key, []);
       }
+      semesterMap.get(key)!.push(r);
     });
+
+    // Sort and filter semesters
+    const sortedSemesters = Array.from(semesterMap.keys()).sort((a, b) => {
+      const [yearA, semA] = a.split('|');
+      const [yearB, semB] = b.split('|');
+      return sortSemesters({ academic_year: yearA, semester: semA }, { academic_year: yearB, semester: semB });
+    });
+
+    // Find equivalency semester
+    let equivalencySemesterKey: string | null = null;
+    for (const key of sortedSemesters) {
+      const semesterRecords = semesterMap.get(key)!;
+      if (semesterRecords.some(r => isPGrade(r.letter_grade, r.final_grade))) {
+        equivalencySemesterKey = key;
+        break;
+      }
+    }
+
+    // Include only from equivalency semester onward
+    const semestersToInclude = equivalencySemesterKey
+      ? sortedSemesters.slice(sortedSemesters.indexOf(equivalencySemesterKey))
+      : sortedSemesters;
+
+    for (const key of semestersToInclude) {
+      const semesterRecords = semesterMap.get(key)!;
+      semesterRecords.forEach(r => {
+        courseMap.set(r.course_code, r);
+      });
+    }
 
     return Array.from(courseMap.values()).map(c => ({
       course_code: c.course_code,
@@ -321,6 +440,7 @@ export function useAcademicRecord() {
       isFailed: isFailed(c.letter_grade, c.final_grade),
       isWithdrawn: isWithdrawn(c.letter_grade),
       isPassed: isPassingGrade(c.letter_grade, c.final_grade),
+      isEquivalent: isPGrade(c.letter_grade, c.final_grade),
     }));
   })() : [];
 
@@ -346,6 +466,7 @@ export function useAcademicRecord() {
     isWithdrawn,
     isPGrade,
     isPassingGrade,
+    GRADE_POINTS,
   };
 }
 
