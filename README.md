@@ -1,73 +1,171 @@
-# Welcome to your Lovable project
+# IntelliPath - AI-Powered Academic Advisor | المرشد الأكاديمي الذكي
 
-## Project info
+<div align="center">
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+![IntelliPath Logo](public/pwa-512x512.png)
 
-## How can I edit this code?
+**A comprehensive AI-powered Academic Advisory System for Engineering Students**
 
-There are several ways of editing your application.
+**نظام إرشاد أكاديمي ذكي شامل لطلاب الهندسة**
 
-**Use Lovable**
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.3-61dafb.svg)](https://reactjs.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.x-38bdf8.svg)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Latest-3ecf8e.svg)](https://supabase.com/)
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+</div>
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 📋 Overview | نظرة عامة
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+IntelliPath is an intelligent academic advisory platform that integrates **10 specialized AI subsystems** to provide personalized academic guidance for engineering students.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+IntelliPath هو منصة إرشاد أكاديمي ذكية تدمج **10 أنظمة فرعية ذكية متخصصة** لتقديم إرشاد أكاديمي مخصص لطلاب الهندسة.
 
-Follow these steps:
+---
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## ✨ Features | الميزات
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 🤖 AI Systems | الأنظمة الذكية
 
-# Step 3: Install the necessary dependencies.
-npm i
+| # | System | النظام | Description | الوصف |
+|---|--------|--------|-------------|-------|
+| 1 | **RAG Chat** | المحادثة الذكية | AI-powered Q&A with academic knowledge | أسئلة وأجوبة مدعومة بالذكاء الاصطناعي |
+| 2 | **Knowledge Graph** | الرسم المعرفي | Visual course relationships | علاقات المقررات المرئية |
+| 3 | **Decision Simulator** | محاكي القرارات | What-if academic scenarios | سيناريوهات "ماذا لو" الأكاديمية |
+| 4 | **Career Planner** | مخطط المسار الوظيفي | Career path recommendations | توصيات المسار الوظيفي |
+| 5 | **Early Warning** | الإنذار المبكر | Academic risk detection | كشف المخاطر الأكاديمية |
+| 6 | **Learning Style** | أسلوب التعلم | Personalized learning analysis | تحليل التعلم الشخصي |
+| 7 | **Gamification** | التلعيب | Achievements and rewards | الإنجازات والمكافآت |
+| 8 | **Talent Ledger** | سجل المواهب | Skills tracking | تتبع المهارات |
+| 9 | **Course Fingerprint** | بصمة المقررات | Course analysis | تحليل المقررات |
+| 10 | **Peer Matching** | مطابقة الأقران | Study group formation | تشكيل مجموعات الدراسة |
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+### 🎯 Core Features | الميزات الأساسية
+
+- ✅ **Bilingual Support** (Arabic/English) | دعم ثنائي اللغة
+- ✅ **Real-time GPA Tracking** | تتبع المعدل التراكمي في الوقت الفعلي
+- ✅ **Academic Records Import** | استيراد السجلات الأكاديمية
+- ✅ **Course Prerequisites Visualization** | تصور المتطلبات المسبقة
+- ✅ **PDF/Excel Export** | تصدير PDF/Excel
+- ✅ **Dark/Light Theme** | السمة الداكنة/الفاتحة
+- ✅ **PWA Support** | دعم تطبيق الويب التقدمي
+- ✅ **Role-based Access** (Student/Advisor/Admin) | وصول قائم على الأدوار
+
+---
+
+## 🛠️ Tech Stack | مكدس التقنيات
+
+### Frontend | الواجهة الأمامية
+- **React 18.3** - UI Framework
+- **TypeScript** - Type Safety
+- **Tailwind CSS** - Styling
+- **shadcn/ui** - UI Components
+- **Framer Motion** - Animations
+- **React Query** - Data Fetching
+- **Zustand** - State Management
+- **i18next** - Internationalization
+
+### Backend | الخادم الخلفي
+- **Supabase** - Backend Platform
+- **PostgreSQL** - Primary Database
+- **Edge Functions** - Serverless Functions
+- **Qdrant** - Vector Database
+- **Neo4j** - Graph Database
+
+### AI/ML | الذكاء الاصطناعي
+- **Gemini Pro/Flash** - LLM
+- **RAG Pipeline** - Document Retrieval
+
+---
+
+## 🚀 Quick Start | البدء السريع
+
+### Prerequisites | المتطلبات
+
+```bash
+node --version  # v18.x or later
+npm --version   # 9.x or later
+```
+
+### Installation | التثبيت
+
+```bash
+# Clone repository | استنساخ المستودع
+git clone https://github.com/your-org/intellipath.git
+cd intellipath
+
+# Install dependencies | تثبيت التبعيات
+npm install
+
+# Start development server | بدء خادم التطوير
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+### Build for Production | البناء للإنتاج
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```bash
+npm run build
+npm run preview
+```
 
-**Use GitHub Codespaces**
+---
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 📁 Project Structure | هيكل المشروع
 
-## What technologies are used for this project?
+```
+intellipath/
+├── docs/                    # Documentation | التوثيق
+├── public/                  # Static assets | الملفات الثابتة
+├── src/
+│   ├── api/                 # API layer | طبقة الـ API
+│   ├── components/          # React components | مكونات React
+│   ├── hooks/               # Custom hooks | الخطافات المخصصة
+│   ├── i18n/                # Internationalization | التدويل
+│   ├── pages/               # Page components | صفحات التطبيق
+│   ├── stores/              # State management | إدارة الحالة
+│   └── utils/               # Utilities | الأدوات المساعدة
+└── supabase/
+    └── functions/           # Edge functions | الدوال الطرفية
+```
 
-This project is built with:
+---
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📚 Documentation | التوثيق
 
-## How can I deploy this project?
+| Document | الوثيقة | Description |
+|----------|---------|-------------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | الهيكل العام | System architecture |
+| [API_REFERENCE.md](docs/API_REFERENCE.md) | مرجع الـ API | API documentation |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | دليل النشر | Deployment guide |
+| [STUDENT_DATA_ISOLATION.md](docs/STUDENT_DATA_ISOLATION.md) | عزل البيانات | Security model |
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
+## 🔒 Security | الأمان
 
-Yes, you can!
+- **Row Level Security (RLS)** - Database-level access control
+- **JWT Authentication** - Secure token-based auth
+- **Data Isolation** - Students can only access their own data
+- **Rate Limiting** - API protection
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+---
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+## 📄 License | الترخيص
+
+This project is proprietary software. All rights reserved.
+
+هذا المشروع برمجية خاصة. جميع الحقوق محفوظة.
+
+---
+
+## 👥 Team | الفريق
+
+Developed by the IntelliPath Engineering Team.
+
+تم التطوير بواسطة فريق هندسة IntelliPath.
+
+---
+
+*Version 2.0.0 | January 2026*
