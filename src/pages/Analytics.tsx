@@ -108,7 +108,7 @@ export default function Analytics() {
     { 
       label: texts.coursesCompleted, 
       value: summary?.passedCourses?.toString() || '0', 
-      subtext: summary?.pGradeCourses ? `(${summary.pGradeCourses} P)` : '',
+      subtext: summary?.equivalentCourses ? `(${summary.equivalentCourses} P)` : '',
       trend: 'up', 
       icon: Award,
       color: 'from-purple-500 to-pink-600'
@@ -365,7 +365,7 @@ export default function Analytics() {
                     
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{isRTL ? 'ساعات معادلة (P)' : 'P Grade Credits'}</span>
-                      <Badge variant="secondary">{summary?.pGradeHours || 0}</Badge>
+                      <Badge variant="secondary">{summary?.equivalencyHours || 0}</Badge>
                     </div>
                     
                     <div className="flex justify-between items-center">
