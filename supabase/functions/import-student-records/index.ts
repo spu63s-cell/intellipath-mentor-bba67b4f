@@ -635,16 +635,37 @@ serve(async (req) => {
       const studentId = (filenameStudentId || getValue(row, 'student_id')).trim();
       if (!studentId) continue;
 
-      const courseCode = getValue(row, 'course_code').trim();
-      const courseName = getValue(row, 'course_name').trim();
-
-      // Skip non-course/summary rows
-      if (!courseCode && !courseName) continue;
+      const courseCodeRaw = getValue(row, 'course_code').trim();
+      const courseNameRaw = getValue(row, 'course_name').trim();
 
       const { semester, academicYear } = parseSemesterYear(
         getValue(row, 'semester'),
         getValue(row, 'academic_year')
       );
+
+      // Allow importing semester summary rows (they often contain the ONLY correct cumulative GPA/hours)
+      const summaryTotalCompletedHours = cleanNumeric(getValue(row, 'total_completed_hours'));
+      const summaryCumulativeGpaPoints = cleanNumeric(getValue(row, 'cumulative_gpa_points'));
+      const summaryCumulativeGpaPercent = cleanNumeric(getValue(row, 'cumulative_gpa_percent'));
+      const summaryRegisteredHoursSemester = cleanNumeric(getValue(row, 'registered_hours_semester'));
+      const summaryCompletedHoursSemester = cleanNumeric(getValue(row, 'completed_hours_semester'));
+
+      const isSummaryRow =
+        !courseCodeRaw &&
+        !courseNameRaw &&
+        (
+          summaryTotalCompletedHours !== null ||
+          summaryCumulativeGpaPoints !== null ||
+          summaryCumulativeGpaPercent !== null ||
+          summaryRegisteredHoursSemester !== null ||
+          summaryCompletedHoursSemester !== null
+        );
+
+      // Skip rows that contain neither course data nor summary data
+      if (!courseCodeRaw && !courseNameRaw && !isSummaryRow) continue;
+
+      const courseCode = isSummaryRow ? '__SUMMARY__' : (courseCodeRaw || 'Unknown');
+      const courseName = isSummaryRow ? '__SUMMARY__' : (courseNameRaw || 'Unknown');
 
       const raw: Record<string, string> = Object.fromEntries(
         headers.map((h, idx) => [h, row[idx] || ''])
@@ -663,24 +684,24 @@ serve(async (req) => {
         study_mode: getValue(row, 'study_mode') || null,
         permanent_status: getValue(row, 'permanent_status') || null,
         semester_status: getValue(row, 'semester_status') || null,
-        registered_hours_semester: cleanNumeric(getValue(row, 'registered_hours_semester')),
-        completed_hours_semester: cleanNumeric(getValue(row, 'completed_hours_semester')),
+        registered_hours_semester: summaryRegisteredHoursSemester,
+        completed_hours_semester: summaryCompletedHoursSemester,
         academic_warning: getValue(row, 'academic_warning') || null,
         previous_academic_warning: getValue(row, 'previous_academic_warning') || null,
-        cumulative_gpa_percent: cleanNumeric(getValue(row, 'cumulative_gpa_percent')),
-        cumulative_gpa_points: cleanNumeric(getValue(row, 'cumulative_gpa_points')),
-        total_completed_hours: cleanNumeric(getValue(row, 'total_completed_hours')),
+        cumulative_gpa_percent: summaryCumulativeGpaPercent,
+        cumulative_gpa_points: summaryCumulativeGpaPoints,
+        total_completed_hours: summaryTotalCompletedHours,
         baccalaureate_type: getValue(row, 'baccalaureate_type') || null,
         baccalaureate_country: getValue(row, 'baccalaureate_country') || null,
         certificate_score: cleanNumeric(getValue(row, 'certificate_score')),
         certificate_average: cleanNumeric(getValue(row, 'certificate_average')),
         has_ministry_scholarship: cleanBoolean(getValue(row, 'has_ministry_scholarship')),
-        course_name: courseName || 'Unknown',
-        course_code: courseCode || 'Unknown',
-        course_credits: cleanNumeric(getValue(row, 'course_credits')) || 3,
-        final_grade: cleanNumeric(getValue(row, 'final_grade')),
-        letter_grade: getValue(row, 'letter_grade') || null,
-        grade_points: cleanNumeric(getValue(row, 'grade_points')),
+        course_name: courseName,
+        course_code: courseCode,
+        course_credits: isSummaryRow ? 0 : (cleanNumeric(getValue(row, 'course_credits')) || 3),
+        final_grade: isSummaryRow ? null : cleanNumeric(getValue(row, 'final_grade')),
+        letter_grade: isSummaryRow ? null : (getValue(row, 'letter_grade') || null),
+        grade_points: isSummaryRow ? null : cleanNumeric(getValue(row, 'grade_points')),
         raw_data: raw,
       };
 

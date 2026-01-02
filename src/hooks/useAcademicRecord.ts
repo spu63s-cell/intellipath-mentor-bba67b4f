@@ -325,34 +325,116 @@ export function useAcademicRecord() {
       ? totalGradePoints / totalCreditsForGPA 
       : 0;
 
-    // Get latest record for metadata
-    const latestRecord = records[records.length - 1];
+    // Pick the most reliable "latest summary" record for cumulative values
+    const latestSemesterKey = sortedSemesters[sortedSemesters.length - 1] || null;
+    const latestSemesterRecords = latestSemesterKey ? semesterMap.get(latestSemesterKey)! : [];
+    const latestSummaryRecord =
+      latestSemesterRecords.find(r => r.course_code === '__SUMMARY__') ||
+      latestSemesterRecords.find(
+        r => r.total_completed_hours !== null || r.cumulative_gpa_points !== null || r.cumulative_gpa_percent !== null
+      ) ||
+      records[records.length - 1];
+
+    // Get unique courses (latest record for each course) from included semesters
+    // NOTE: we skip the synthetic __SUMMARY__ rows.
+    const courseMap = new Map<string, AcademicRecord>();
+    for (const key of semestersToInclude) {
+      const semesterRecords = semesterMap.get(key)!;
+      semesterRecords.forEach(r => {
+        if (r.course_code === '__SUMMARY__') return;
+        // Always take the latest record for each course
+        courseMap.set(r.course_code, r);
+      });
+    }
+
+    const uniqueCourses = Array.from(courseMap.values());
+
+    // Process each course
+    const processedCourses: CourseRecord[] = uniqueCourses.map(c => ({
+      course_code: c.course_code,
+      course_name: c.course_name,
+      credits: c.course_credits || 0,
+      final_grade: c.final_grade,
+      letter_grade: c.letter_grade,
+      grade_points: GRADE_POINTS[c.letter_grade || ''] ?? 0,
+      academic_year: c.academic_year,
+      semester: c.semester,
+      isExcludedFromGPA: isExcludedFromGPA(c.letter_grade, c.final_grade),
+      isFailed: isFailed(c.letter_grade, c.final_grade),
+      isWithdrawn: isWithdrawn(c.letter_grade),
+      isPassed: isPassingGrade(c.letter_grade, c.final_grade),
+      isEquivalent: isPGrade(c.letter_grade, c.final_grade),
+    }));
+
+    // Separate categories
+    const passedCourses = processedCourses.filter(c => c.isPassed && !c.isWithdrawn);
+    const failedCourses = processedCourses.filter(c => c.isFailed);
+    const withdrawnCourses = processedCourses.filter(c => c.isWithdrawn);
+
+    // Courses that count towards GPA (passed, NOT P grades, NOT withdrawn)
+    const gpaEligibleCourses = passedCourses.filter(c => !c.isExcludedFromGPA);
+
+    // Calculate post-equivalency earned hours (passed courses that are NOT P grades)
+    const postEquivalencyHours = passedCourses
+      .filter(c => !c.isEquivalent)
+      .reduce((sum, c) => sum + c.credits, 0);
+
+    // Total completed hours = equivalency hours + post-equivalency passed hours
+    let totalCompletedHours = equivalencyHours + postEquivalencyHours;
+
+    // Calculate GPA (ONLY from post-equivalency courses that are not P grades)
+    let totalGradePoints = 0;
+    let totalCreditsForGPA = 0;
+
+    gpaEligibleCourses.forEach(c => {
+      const points = GRADE_POINTS[c.letter_grade || ''] ?? 0;
+      totalGradePoints += points * c.credits;
+      totalCreditsForGPA += c.credits;
+    });
+
+    let cumulativeGPA = totalCreditsForGPA > 0
+      ? totalGradePoints / totalCreditsForGPA
+      : 0;
+
+    // Prefer official cumulative values from the latest summary (when available)
+    const officialTotalHours = latestSummaryRecord?.total_completed_hours ?? null;
+    const officialCumulativeGpa = latestSummaryRecord?.cumulative_gpa_points ?? null;
+    const officialCumulativePercent = latestSummaryRecord?.cumulative_gpa_percent ?? null;
+
+    if (typeof officialTotalHours === 'number') {
+      totalCompletedHours = officialTotalHours;
+    }
+    if (typeof officialCumulativeGpa === 'number') {
+      cumulativeGPA = officialCumulativeGpa;
+    }
 
     // Build semester summaries
     const semesters: SemesterSummary[] = semestersToInclude.map(key => {
       const [academic_year, semester] = key.split('|');
       const semesterRecords = semesterMap.get(key)!;
-      
-      const courses: CourseRecord[] = semesterRecords.map(c => ({
-        course_code: c.course_code,
-        course_name: c.course_name,
-        credits: c.course_credits || 0,
-        final_grade: c.final_grade,
-        letter_grade: c.letter_grade,
-        grade_points: GRADE_POINTS[c.letter_grade || ''] ?? 0,
-        academic_year: c.academic_year,
-        semester: c.semester,
-        isExcludedFromGPA: isExcludedFromGPA(c.letter_grade, c.final_grade),
-        isFailed: isFailed(c.letter_grade, c.final_grade),
-        isWithdrawn: isWithdrawn(c.letter_grade),
-        isPassed: isPassingGrade(c.letter_grade, c.final_grade),
-        isEquivalent: isPGrade(c.letter_grade, c.final_grade),
-      }));
+
+      const courses: CourseRecord[] = semesterRecords
+        .filter(c => c.course_code !== '__SUMMARY__')
+        .map(c => ({
+          course_code: c.course_code,
+          course_name: c.course_name,
+          credits: c.course_credits || 0,
+          final_grade: c.final_grade,
+          letter_grade: c.letter_grade,
+          grade_points: GRADE_POINTS[c.letter_grade || ''] ?? 0,
+          academic_year: c.academic_year,
+          semester: c.semester,
+          isExcludedFromGPA: isExcludedFromGPA(c.letter_grade, c.final_grade),
+          isFailed: isFailed(c.letter_grade, c.final_grade),
+          isWithdrawn: isWithdrawn(c.letter_grade),
+          isPassed: isPassingGrade(c.letter_grade, c.final_grade),
+          isEquivalent: isPGrade(c.letter_grade, c.final_grade),
+        }));
 
       const gpaEligible = courses.filter(c => c.isPassed && !c.isExcludedFromGPA);
       const semesterGPAPoints = gpaEligible.reduce((sum, c) => sum + (c.grade_points * c.credits), 0);
       const semesterGPACredits = gpaEligible.reduce((sum, c) => sum + c.credits, 0);
-      
+
       return {
         academic_year,
         semester,
@@ -370,22 +452,24 @@ export function useAcademicRecord() {
 
     return {
       studentId: studentData!.student_id,
-      college: latestRecord.college || 'كلية الهندسة',
-      major: latestRecord.major || studentData?.major || 'غير محدد',
+      college: latestSummaryRecord?.college || 'كلية الهندسة',
+      major: latestSummaryRecord?.major || studentData?.major || 'غير محدد',
       totalCompletedHours,
       equivalencyHours,
       postEquivalencyHours,
       requiredHours: REQUIRED_HOURS,
       remainingHours: Math.max(REQUIRED_HOURS - totalCompletedHours, 0),
       cumulativeGPA: Math.round(cumulativeGPA * 100) / 100,
-      cumulativePercentage: (cumulativeGPA / 4.0) * 100,
+      cumulativePercentage: typeof officialCumulativePercent === 'number'
+        ? officialCumulativePercent
+        : (cumulativeGPA / 4.0) * 100,
       coursesCount: uniqueCourses.length,
       passedCourses: passedCourses.length,
       failedCourses: failedCourses.length,
       withdrawnCourses: withdrawnCourses.length,
       equivalentCourses: equivalentCoursesCount,
-      academicWarning: latestRecord.academic_warning,
-      permanentStatus: latestRecord.permanent_status,
+      academicWarning: latestSummaryRecord?.academic_warning ?? null,
+      permanentStatus: latestSummaryRecord?.permanent_status ?? null,
       isGraduationEligible: cumulativeGPA >= 2.0 && totalCompletedHours >= REQUIRED_HOURS,
       progressPercentage,
       semesters,
