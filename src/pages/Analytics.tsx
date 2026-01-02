@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { CardGlass, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,10 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLanguageStore } from '@/stores/languageStore';
+import { useAcademicRecord, GRADE_POINTS } from '@/hooks/useAcademicRecord';
 import { 
   BarChart3, TrendingUp, TrendingDown, BookOpen, Clock, Target, 
-  Award, Calendar, PieChart, Activity, GraduationCap, Zap, Download
+  Award, Calendar, PieChart, Activity, GraduationCap, Zap, Download, AlertTriangle
 } from 'lucide-react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -18,55 +20,48 @@ import {
   PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar
 } from 'recharts';
 
-// Mock data for analytics
-const gpaHistory = [
-  { semester: 'F2021', gpa: 2.8, credits: 15 },
-  { semester: 'S2022', gpa: 3.0, credits: 16 },
-  { semester: 'F2022', gpa: 3.2, credits: 18 },
-  { semester: 'S2023', gpa: 3.4, credits: 15 },
-  { semester: 'F2023', gpa: 3.3, credits: 17 },
-  { semester: 'S2024', gpa: 3.5, credits: 16 },
-];
-
-const coursePerformance = [
-  { subject: 'Programming', score: 85, avg: 72 },
-  { subject: 'Mathematics', score: 78, avg: 68 },
-  { subject: 'Physics', score: 82, avg: 70 },
-  { subject: 'Networks', score: 90, avg: 75 },
-  { subject: 'Databases', score: 88, avg: 73 },
-];
-
-const gradeDistribution = [
-  { grade: 'A', count: 8, color: '#22c55e' },
-  { grade: 'B+', count: 12, color: '#84cc16' },
-  { grade: 'B', count: 10, color: '#eab308' },
-  { grade: 'C+', count: 5, color: '#f97316' },
-  { grade: 'C', count: 3, color: '#ef4444' },
-];
-
-const studyHabits = [
-  { day: 'Sun', hours: 4 },
-  { day: 'Mon', hours: 6 },
-  { day: 'Tue', hours: 5 },
-  { day: 'Wed', hours: 7 },
-  { day: 'Thu', hours: 4 },
-  { day: 'Fri', hours: 2 },
-  { day: 'Sat', hours: 3 },
-];
-
-const skillsRadar = [
-  { skill: 'Coding', value: 85 },
-  { skill: 'Problem Solving', value: 78 },
-  { skill: 'Communication', value: 70 },
-  { skill: 'Teamwork', value: 82 },
-  { skill: 'Leadership', value: 65 },
-  { skill: 'Research', value: 75 },
-];
-
 export default function Analytics() {
   const { language } = useLanguageStore();
   const isRTL = language === 'ar';
-  const [selectedPeriod, setSelectedPeriod] = useState('semester');
+  const [selectedPeriod, setSelectedPeriod] = useState('allTime');
+  
+  const { summary, allCourses, isLoading, hasAcademicRecord } = useAcademicRecord();
+
+  // Build GPA history from academic records
+  const gpaHistory = useMemo(() => {
+    if (!summary?.semesters) return [];
+    return summary.semesters
+      .filter(s => s.semesterGPA > 0)
+      .reverse()
+      .map(s => ({
+        semester: `${s.semester.substring(0, 10)}`,
+        gpa: Math.round(s.semesterGPA * 100) / 100,
+        credits: s.earnedCredits,
+      }));
+  }, [summary]);
+
+  // Build grade distribution from courses
+  const gradeDistribution = useMemo(() => {
+    const dist: Record<string, { grade: string; count: number; color: string }> = {
+      'A': { grade: 'A', count: 0, color: '#22c55e' },
+      'B': { grade: 'B', count: 0, color: '#84cc16' },
+      'C': { grade: 'C', count: 0, color: '#eab308' },
+      'D': { grade: 'D', count: 0, color: '#f97316' },
+      'F': { grade: 'F', count: 0, color: '#ef4444' },
+      'P': { grade: 'P', count: 0, color: '#3b82f6' },
+    };
+    
+    allCourses.forEach(c => {
+      if (c.letter_grade) {
+        const baseGrade = c.letter_grade.charAt(0);
+        if (dist[baseGrade]) {
+          dist[baseGrade].count++;
+        }
+      }
+    });
+    
+    return Object.values(dist).filter(d => d.count > 0);
+  }, [allCourses]);
 
   const texts = {
     title: isRTL ? 'التحليلات الأكاديمية' : 'Academic Analytics',
@@ -75,9 +70,9 @@ export default function Analytics() {
     performance: isRTL ? 'الأداء' : 'Performance',
     trends: isRTL ? 'الاتجاهات' : 'Trends',
     currentGpa: isRTL ? 'المعدل الحالي' : 'Current GPA',
-    totalCredits: isRTL ? 'إجمالي الساعات' : 'Total Credits',
-    coursesCompleted: isRTL ? 'المقررات المكتملة' : 'Courses Completed',
-    ranking: isRTL ? 'الترتيب' : 'Ranking',
+    totalCredits: isRTL ? 'الساعات المنجزة' : 'Earned Credits',
+    coursesCompleted: isRTL ? 'المقررات الناجحة' : 'Passed Courses',
+    remaining: isRTL ? 'المتبقي للتخرج' : 'Remaining',
     gpaHistory: isRTL ? 'تاريخ المعدل' : 'GPA History',
     gradeDistribution: isRTL ? 'توزيع الدرجات' : 'Grade Distribution',
     coursePerformance: isRTL ? 'أداء المقررات' : 'Course Performance',
@@ -89,42 +84,74 @@ export default function Analytics() {
     semester: isRTL ? 'الفصل' : 'Semester',
     year: isRTL ? 'السنة' : 'Year',
     allTime: isRTL ? 'كل الوقت' : 'All Time',
+    noData: isRTL ? 'لا توجد بيانات أكاديمية' : 'No academic data available',
+    pGradeNote: isRTL ? 'P = معادلة (لا تحسب بالمعدل)' : 'P = Credited (not in GPA)',
   };
 
   const stats = [
     { 
       label: texts.currentGpa, 
-      value: '3.50', 
-      change: '+0.15', 
-      trend: 'up', 
+      value: summary?.cumulativeGPA?.toFixed(2) || '0.00', 
+      change: summary?.cumulativeGPA && summary.cumulativeGPA >= 2.0 ? '+' : '', 
+      trend: summary?.cumulativeGPA && summary.cumulativeGPA >= 2.0 ? 'up' : 'down', 
       icon: GraduationCap,
       color: 'from-emerald-500 to-green-600'
     },
     { 
       label: texts.totalCredits, 
-      value: '97', 
-      change: '+16', 
+      value: summary?.totalCompletedHours?.toString() || '0', 
+      subtext: `/ 173`,
       trend: 'up', 
       icon: BookOpen,
       color: 'from-blue-500 to-cyan-600'
     },
     { 
       label: texts.coursesCompleted, 
-      value: '38', 
-      change: '+6', 
+      value: summary?.passedCourses?.toString() || '0', 
+      subtext: summary?.pGradeCourses ? `(${summary.pGradeCourses} P)` : '',
       trend: 'up', 
       icon: Award,
       color: 'from-purple-500 to-pink-600'
     },
     { 
-      label: texts.ranking, 
-      value: '#15', 
-      change: '+5', 
-      trend: 'up', 
+      label: texts.remaining, 
+      value: summary?.remainingHours?.toString() || '173', 
+      subtext: isRTL ? 'ساعة' : 'hrs',
+      trend: 'neutral', 
       icon: Target,
       color: 'from-amber-500 to-orange-600'
     },
   ];
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="p-4 md:p-6 space-y-6">
+          <Skeleton className="h-32 w-full rounded-xl" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+          </div>
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  if (!hasAcademicRecord) {
+    return (
+      <MainLayout>
+        <div className="p-4 md:p-6">
+          <CardGlass className="p-12 text-center">
+            <AlertTriangle className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">{texts.noData}</h2>
+            <p className="text-muted-foreground">
+              {isRTL ? 'يرجى رفع سجلاتك الأكاديمية أولاً' : 'Please upload your academic records first'}
+            </p>
+          </CardGlass>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -150,16 +177,9 @@ export default function Analytics() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                <SelectTrigger className="w-[150px] bg-background/50">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semester">{texts.semester}</SelectItem>
-                  <SelectItem value="year">{texts.year}</SelectItem>
-                  <SelectItem value="allTime">{texts.allTime}</SelectItem>
-                </SelectContent>
-              </Select>
+              <Badge variant="outline" className="text-xs">
+                {texts.pGradeNote}
+              </Badge>
               <Button variant="outline" className="gap-2">
                 <Download className="h-4 w-4" />
                 {texts.download}
@@ -297,55 +317,77 @@ export default function Analytics() {
           {/* Performance Tab */}
           <TabsContent value="performance" className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Course Performance */}
+              {/* Course Performance - Using real data */}
               <CardGlass>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BookOpen className="h-5 w-5 text-primary" />
                     {texts.coursePerformance}
                   </CardTitle>
-                  <CardDescription>{texts.vsAverage}</CardDescription>
+                  <CardDescription>{isRTL ? 'آخر 10 مقررات' : 'Last 10 courses'}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={coursePerformance} layout="vertical">
+                      <BarChart 
+                        data={allCourses.slice(0, 10).map(c => ({
+                          subject: c.course_code,
+                          score: c.final_grade || 0,
+                        }))} 
+                        layout="vertical"
+                      >
                         <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
                         <XAxis type="number" domain={[0, 100]} />
                         <YAxis dataKey="subject" type="category" width={80} tick={{ fontSize: 11 }} />
                         <Tooltip />
                         <Bar dataKey="score" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                        <Bar dataKey="avg" fill="hsl(var(--muted-foreground))" radius={[0, 4, 4, 0]} opacity={0.5} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
               </CardGlass>
 
-              {/* Skills Radar */}
+              {/* Credits Breakdown */}
               <CardGlass>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Zap className="h-5 w-5 text-primary" />
-                    {texts.skillsAnalysis}
+                    {isRTL ? 'توزيع الساعات' : 'Credits Breakdown'}
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="h-[300px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart data={skillsRadar}>
-                        <PolarGrid />
-                        <PolarAngleAxis dataKey="skill" tick={{ fontSize: 11 }} />
-                        <PolarRadiusAxis domain={[0, 100]} />
-                        <Radar
-                          name="Skills"
-                          dataKey="value"
-                          stroke="hsl(var(--primary))"
-                          fill="hsl(var(--primary))"
-                          fillOpacity={0.3}
-                        />
-                      </RadarChart>
-                    </ResponsiveContainer>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm">{isRTL ? 'ساعات صالحة' : 'Valid Credits'}</span>
+                      <Badge variant="default">{summary?.totalCompletedHours || 0}</Badge>
+                    </div>
+                    <Progress value={(summary?.totalCompletedHours || 0) / 173 * 100} className="h-2" />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{isRTL ? 'ساعات معادلة (P)' : 'P Grade Credits'}</span>
+                      <Badge variant="secondary">{summary?.pGradeHours || 0}</Badge>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{isRTL ? 'المطلوب للتخرج' : 'Required for Graduation'}</span>
+                      <Badge variant="outline">173</Badge>
+                    </div>
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-amber-600">{isRTL ? 'المتبقي' : 'Remaining'}</span>
+                      <Badge variant="outline" className="bg-amber-500/10 text-amber-600">
+                        {summary?.remainingHours || 173}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  <div className="pt-4 border-t">
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">{isRTL ? 'نسبة الإنجاز' : 'Completion'}</span>
+                      <span className="text-xl font-bold text-primary">
+                        {summary?.progressPercentage?.toFixed(1) || 0}%
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
               </CardGlass>
@@ -357,22 +399,34 @@ export default function Analytics() {
             <CardGlass>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  {texts.studyHours} - {texts.thisWeek}
+                  <TrendingUp className="h-5 w-5 text-primary" />
+                  {isRTL ? 'تطور المعدل عبر الفصول' : 'GPA Progress Over Semesters'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={studyHabits}>
-                      <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                      <XAxis dataKey="day" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="hours" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                {gpaHistory.length > 0 ? (
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={gpaHistory}>
+                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                        <XAxis dataKey="semester" tick={{ fontSize: 10 }} />
+                        <YAxis domain={[0, 4]} />
+                        <Tooltip />
+                        <Line 
+                          type="monotone" 
+                          dataKey="gpa" 
+                          stroke="hsl(var(--primary))" 
+                          strokeWidth={2}
+                          dot={{ fill: 'hsl(var(--primary))' }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    {isRTL ? 'لا توجد بيانات كافية' : 'Not enough data'}
+                  </div>
+                )}
               </CardContent>
             </CardGlass>
           </TabsContent>

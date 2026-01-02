@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { CardGlass, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,9 +13,10 @@ import { useLanguageStore } from '@/stores/languageStore';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
+import { useAcademicRecord } from '@/hooks/useAcademicRecord';
 import { 
   Search, BookOpen, Clock, Users, Star, Filter, TrendingUp, 
-  BarChart3, Target, Award, ThumbsUp, ThumbsDown, Percent
+  BarChart3, Target, Award, ThumbsUp, ThumbsDown, Percent, CheckCircle2, XCircle, AlertTriangle
 } from 'lucide-react';
 
 interface Course {
@@ -33,20 +34,6 @@ interface Course {
   is_active: boolean;
 }
 
-// Mock analytics data (would come from backend in production)
-const getCourseAnalytics = (courseId: string) => ({
-  passRate: Math.floor(Math.random() * 30) + 65,
-  avgGrade: (Math.random() * 2 + 2).toFixed(2),
-  totalEnrollments: Math.floor(Math.random() * 500) + 100,
-  difficultyVotes: {
-    easy: Math.floor(Math.random() * 30),
-    medium: Math.floor(Math.random() * 50),
-    hard: Math.floor(Math.random() * 20),
-  },
-  studentReviews: Math.floor(Math.random() * 100) + 20,
-  recommendationRate: Math.floor(Math.random() * 40) + 55,
-});
-
 export default function Courses() {
   const { language } = useLanguageStore();
   const { t } = useTranslation();
@@ -57,6 +44,10 @@ export default function Courses() {
   const [selectedYear, setSelectedYear] = useState<string>('all');
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [compareList, setCompareList] = useState<Course[]>([]);
+  const [activeTab, setActiveTab] = useState<string>('all');
+
+  // Get student's academic records
+  const { allCourses: myCourses, summary, isLoading: academicLoading } = useAcademicRecord();
 
   const { data: courses = [], isLoading } = useQuery({
     queryKey: ['courses'],
@@ -72,15 +63,38 @@ export default function Courses() {
     }
   });
 
+  // Enrich courses with student's grades
+  const enrichedCourses = useMemo(() => {
+    return courses.map(course => {
+      const myRecord = myCourses.find(c => c.course_code === course.code);
+      return {
+        ...course,
+        myGrade: myRecord?.letter_grade || null,
+        myFinalGrade: myRecord?.final_grade || null,
+        isPassed: myRecord?.isPassed || false,
+        isFailed: myRecord?.isFailed || false,
+        isExcludedFromGPA: myRecord?.isExcludedFromGPA || false,
+        isTaken: !!myRecord,
+      };
+    });
+  }, [courses, myCourses]);
+
   const departments = [...new Set(courses.map(c => c.department))];
   const years = [...new Set(courses.map(c => c.year_level))].sort();
 
-  const filteredCourses = courses.filter(course => {
+  const filteredCourses = enrichedCourses.filter(course => {
     const name = isRTL && course.name_ar ? course.name_ar : course.name;
     const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          course.code.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDepartment = selectedDepartment === 'all' || course.department === selectedDepartment;
     const matchesYear = selectedYear === 'all' || course.year_level === parseInt(selectedYear);
+    
+    // Filter by tab
+    if (activeTab === 'taken') return matchesSearch && matchesDepartment && matchesYear && course.isTaken;
+    if (activeTab === 'passed') return matchesSearch && matchesDepartment && matchesYear && course.isPassed;
+    if (activeTab === 'failed') return matchesSearch && matchesDepartment && matchesYear && course.isFailed;
+    if (activeTab === 'remaining') return matchesSearch && matchesDepartment && matchesYear && !course.isTaken;
+    
     return matchesSearch && matchesDepartment && matchesYear;
   });
 
@@ -96,6 +110,23 @@ export default function Courses() {
     if (rating <= 2) return isRTL ? 'سهل' : 'Easy';
     if (rating <= 3.5) return isRTL ? 'متوسط' : 'Medium';
     return isRTL ? 'صعب' : 'Hard';
+  };
+
+  // Mock analytics (would come from backend)
+  const getCourseAnalytics = (courseId: string) => ({
+    passRate: Math.floor(Math.random() * 30) + 65,
+    avgGrade: (Math.random() * 2 + 2).toFixed(2),
+    totalEnrollments: Math.floor(Math.random() * 500) + 100,
+    studentReviews: Math.floor(Math.random() * 100) + 20,
+  });
+    if (!grade) return 'bg-muted';
+    if (isExcluded) return 'bg-blue-500'; // P grade
+    if (grade.startsWith('A')) return 'bg-emerald-500';
+    if (grade.startsWith('B')) return 'bg-green-500';
+    if (grade.startsWith('C')) return 'bg-yellow-500';
+    if (grade.startsWith('D')) return 'bg-orange-500';
+    if (grade === 'F') return 'bg-red-500';
+    return 'bg-muted';
   };
 
   const toggleCompare = (course: Course) => {
@@ -130,6 +161,12 @@ export default function Courses() {
     addToCompare: isRTL ? 'أضف للمقارنة' : 'Add to Compare',
     clearCompare: isRTL ? 'مسح المقارنة' : 'Clear Compare',
     difficultyVotes: isRTL ? 'تصويتات الصعوبة' : 'Difficulty Votes',
+    allCourses: isRTL ? 'جميع المقررات' : 'All Courses',
+    myCourses: isRTL ? 'مقرراتي' : 'My Courses',
+    passed: isRTL ? 'ناجح' : 'Passed',
+    failed: isRTL ? 'راسب' : 'Failed',
+    remaining: isRTL ? 'متبقية' : 'Remaining',
+    pGradeNote: isRTL ? 'لا يحسب بالمعدل' : 'Not in GPA',
   };
 
   return (
@@ -155,6 +192,12 @@ export default function Courses() {
                   <BookOpen className="w-4 h-4 mr-1" />
                   {filteredCourses.length} {isRTL ? 'مقرر' : 'courses'}
                 </Badge>
+                {summary && (
+                  <Badge variant="outline" className="text-sm">
+                    <CheckCircle2 className="w-4 h-4 mr-1 text-emerald-500" />
+                    {summary.passedCourses} {isRTL ? 'ناجح' : 'passed'}
+                  </Badge>
+                )}
                 {compareList.length > 0 && (
                   <Badge variant="outline" className="text-sm">
                     <BarChart3 className="w-4 h-4 mr-1" />
@@ -165,6 +208,17 @@ export default function Courses() {
             </div>
           </div>
         </motion.div>
+
+        {/* Course Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="glass grid w-full grid-cols-5 mb-4">
+            <TabsTrigger value="all">{texts.allCourses}</TabsTrigger>
+            <TabsTrigger value="taken">{texts.myCourses}</TabsTrigger>
+            <TabsTrigger value="passed" className="text-emerald-600">{texts.passed}</TabsTrigger>
+            <TabsTrigger value="failed" className="text-red-600">{texts.failed}</TabsTrigger>
+            <TabsTrigger value="remaining">{texts.remaining}</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {/* Filters */}
         <CardGlass>
