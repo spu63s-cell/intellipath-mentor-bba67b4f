@@ -73,3 +73,6 @@ verify_jwt = true
 
 [functions.course-data-import]
 verify_jwt = true
+
+[functions.secure-chat-context]
+verify_jwt = true
