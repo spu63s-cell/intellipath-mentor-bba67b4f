@@ -1,4 +1,8 @@
-// IntelliPath API Hooks
+// =============================================================================
+// IntelliPath API Hooks | خطافات API لـ IntelliPath
+// =============================================================================
+
+// Core IntelliPath Hooks | الخطافات الأساسية
 export { useIntelliPathAuth } from './useIntelliPathAuth';
 export { useIntelliPathChat } from './useIntelliPathChat';
 export { useIntelliPathAcademic } from './useIntelliPathAcademic';
@@ -7,7 +11,7 @@ export { useIntelliPathWellness } from './useIntelliPathWellness';
 export { useIntelliPathPeerMatching } from './useIntelliPathPeerMatching';
 export { useIntelliPathGamification } from './useIntelliPathGamification';
 
-// Lovable Cloud Hooks (using Supabase Edge Functions)
+// Backend Hooks (using Supabase Edge Functions) | خطافات الباكند
 export { useAgenticChat } from './useAgenticChat';
 export { useAcademicAnalysis } from './useAcademicAnalysis';
 

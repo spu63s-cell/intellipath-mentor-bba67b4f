@@ -714,11 +714,13 @@ serve(async (req) => {
     
     const { messages, mode, student_context } = parseResult.data;
     
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    // Get API keys from environment | الحصول على مفاتيح API من البيئة
+    const AI_API_KEY = Deno.env.get("LOVABLE_API_KEY") || Deno.env.get("AI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const AI_GATEWAY_URL = Deno.env.get("AI_GATEWAY_URL") || "https://api.openai.com/v1";
 
-    if (!LOVABLE_API_KEY) {
+    if (!AI_API_KEY) {
       return createErrorResponse(
         'MISSING_API_KEY',
         'AI service is not configured',
@@ -787,10 +789,11 @@ serve(async (req) => {
         iterations++;
         console.log(`AI iteration ${iterations}`);
 
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        // Call AI gateway | استدعاء بوابة الذكاء الاصطناعي
+        const response = await fetch(`${AI_GATEWAY_URL}/chat/completions`, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            Authorization: `Bearer ${AI_API_KEY}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
@@ -898,11 +901,11 @@ serve(async (req) => {
       });
     }
 
-    // Simple/RAG mode - direct streaming without tool calling
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    // Simple/RAG mode - direct streaming without tool calling | الوضع البسيط/RAG - بث مباشر بدون استدعاء الأدوات
+    const response = await fetch(`${AI_GATEWAY_URL}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
