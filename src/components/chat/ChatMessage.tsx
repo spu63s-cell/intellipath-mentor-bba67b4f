@@ -83,6 +83,9 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
               <p className="m-0 whitespace-pre-wrap">{content}</p>
             ) : (
               <ReactMarkdown
+                skipHtml={true}
+                unwrapDisallowed={true}
+                allowedElements={['p', 'ul', 'ol', 'li', 'code', 'pre', 'strong', 'em', 'h1', 'h2', 'h3', 'h4', 'a', 'blockquote', 'br']}
                 components={{
                   p: ({ children }) => <p className="m-0 mb-2 last:mb-0">{children}</p>,
                   ul: ({ children }) => <ul className="my-2 list-disc pr-4 rtl:pl-4 rtl:pr-0">{children}</ul>,
@@ -95,9 +98,26 @@ export function ChatMessage({ role, content, isStreaming }: ChatMessageProps) {
                     <pre className="my-2 overflow-x-auto rounded-lg bg-muted/30 p-3 backdrop-blur-sm">{children}</pre>
                   ),
                   strong: ({ children }) => <strong className="font-semibold text-secondary">{children}</strong>,
+                  em: ({ children }) => <em className="italic">{children}</em>,
                   h1: ({ children }) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
                   h2: ({ children }) => <h2 className="text-base font-bold mb-2">{children}</h2>,
                   h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
+                  h4: ({ children }) => <h4 className="text-sm font-semibold mb-1">{children}</h4>,
+                  a: ({ href, children }) => (
+                    <a 
+                      href={href} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-primary underline hover:no-underline"
+                    >
+                      {children}
+                    </a>
+                  ),
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-r-2 rtl:border-r-0 rtl:border-l-2 border-secondary/50 pr-3 rtl:pr-0 rtl:pl-3 my-2 italic text-muted-foreground">
+                      {children}
+                    </blockquote>
+                  ),
                 }}
               >
                 {content}
