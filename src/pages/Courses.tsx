@@ -118,7 +118,15 @@ export default function Courses() {
     avgGrade: (Math.random() * 2 + 2).toFixed(2),
     totalEnrollments: Math.floor(Math.random() * 500) + 100,
     studentReviews: Math.floor(Math.random() * 100) + 20,
+    recommendationRate: Math.floor(Math.random() * 20) + 75,
+    difficultyVotes: {
+      easy: Math.floor(Math.random() * 50) + 10,
+      medium: Math.floor(Math.random() * 80) + 20,
+      hard: Math.floor(Math.random() * 40) + 5,
+    },
   });
+
+  const getGradeColor = (grade: string | null, isExcluded: boolean = false) => {
     if (!grade) return 'bg-muted';
     if (isExcluded) return 'bg-blue-500'; // P grade
     if (grade.startsWith('A')) return 'bg-emerald-500';
