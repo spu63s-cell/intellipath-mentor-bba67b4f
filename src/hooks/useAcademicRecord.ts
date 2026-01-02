@@ -225,28 +225,30 @@ export function useAcademicRecord() {
       return sortSemesters({ academic_year: yearA, semester: semA }, { academic_year: yearB, semester: semB });
     });
 
-    // Find the EQUIVALENCY SEMESTER (semester with P grades)
+    // Find the EQUIVALENCY SEMESTER (the one with the BIGGEST total of P-grade credits)
+    // This matches the real-world "معادلة" behavior (e.g., 33 ساعة معادلة) and avoids
+    // falsely picking early isolated P courses.
     let equivalencySemesterKey: string | null = null;
+    let maxEquivalencyCredits = 0;
+
     for (const key of sortedSemesters) {
       const semesterRecords = semesterMap.get(key)!;
-      const hasPGrades = semesterRecords.some(r => isPGrade(r.letter_grade, r.final_grade));
-      if (hasPGrades) {
+      const pCredits = semesterRecords
+        .filter(r => isPGrade(r.letter_grade, r.final_grade))
+        .reduce((sum, r) => sum + (r.course_credits || 0), 0);
+
+      if (pCredits > maxEquivalencyCredits) {
         equivalencySemesterKey = key;
-        break; // Take the first (earliest) equivalency semester
+        maxEquivalencyCredits = pCredits;
       }
     }
 
     // Calculate equivalency hours (from P grades in equivalency semester)
-    let equivalencyHours = 0;
+    let equivalencyHours = maxEquivalencyCredits;
     let equivalentCoursesCount = 0;
     if (equivalencySemesterKey) {
       const equivalencySemesterRecords = semesterMap.get(equivalencySemesterKey)!;
-      equivalencySemesterRecords.forEach(r => {
-        if (isPGrade(r.letter_grade, r.final_grade)) {
-          equivalencyHours += r.course_credits || 0;
-          equivalentCoursesCount++;
-        }
-      });
+      equivalentCoursesCount = equivalencySemesterRecords.filter(r => isPGrade(r.letter_grade, r.final_grade)).length;
     }
 
     // Determine which semesters to include in calculations
